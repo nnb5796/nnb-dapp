@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>牛牛币 NNB (测试版)</title>
+    <title>牛牛币 NNB</title>
     <link rel="icon" href="images/logo.png" type="image/png">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
-    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+    <link rel="stylesheet" href="style.css?v=20260729">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css?v=20260729">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css?v=20260729">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css"></head>
+
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css?v=20260729">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css?v=20260729"></head>
 <body>
-    <div style="background:rgba(255,215,0,0.15);color:#ffd700;text-align:center;padding:6px;font-size:12px;font-weight:600;">演示模式 · 模拟数据 · 非真实交易</div>
+
 
     <!-- 顶部栏 -->
     <header class="topbar">
@@ -22,9 +22,9 @@
             <span class="topbar-title">NNB</span>
         </div>
         <div class="topbar-right">
-            <span class="topbar-price" id="topPrice">0.01700 U</span>
+            <span class="topbar-price" id="topPrice">0.00000 U</span>
             <button class="btn-lang"><i class="ph ph-globe"></i></button>
-            <button class="btn-connect connected"><i class="ph-fill ph-check-circle"></i> 0xE34A...1EF1</button>
+            <button id="connectBtn" class="btn-connect" onclick="connectWallet()"><i class="ph ph-wallet"></i> <span>连接钱包</span></button>
         </div>
     </header>
 
@@ -34,8 +34,8 @@
         <div class="page page-active" id="page-home">
             <div class="home-card">
                 <div class="home-progress">
-                    <div class="home-progress-title">账户ID: 837264</div>
-                    <div class="home-progress-value">出局进度: 0%</div>
+                    <div class="home-progress-title">账户ID: --</div>
+                    <div class="home-progress-value">出局进度: --</div>
                 </div>
             </div>
             <div class="home-buttons">
@@ -48,11 +48,11 @@
             <div class="info-card">
                 <div class="card-header">节点</div>
                 <div class="node-buttons">
-                    <button class="btn-action btn-normal" onclick="demoToast('购买成功（演示）')"><i class="ph-fill ph-medal"></i> <span>普通 500U</span></button>
-                    <button class="btn-action btn-super" onclick="demoToast('购买成功（演示）')"><i class="ph-fill ph-crown"></i> <span>超级 1000U</span></button>
+                    <button class="btn-action btn-normal" onclick="buyNormalNode()"><i class="ph-fill ph-medal"></i> <span>普通 500U</span></button>
+                    <button class="btn-action btn-super" onclick="buyNormalNode()"><i class="ph-fill ph-crown"></i> <span>超级 1000U</span></button>
                 </div>
-                <div class="info-row" style="margin-top:8px"><span class="info-label">普通已售</span><span class="info-value">2 / 1000</span></div>
-                <div class="info-row"><span class="info-label">超级已售</span><span class="info-value">1 / 500</span></div>
+                <div class="info-row" style="margin-top:8px"><span class="info-label">普通已售</span><span class="info-value" id="normalSoldHome">0 / 1000</span></div>
+                <div class="info-row"><span class="info-label">超级已售</span><span class="info-value" id="superSoldHome">0 / 500</span></div>
             </div>
             <div class="home-logo">
                 <div class="bull-animation">
@@ -61,9 +61,9 @@
             </div>
             <div class="home-price-trend">
                 <div class="trend-title">官方价走势</div>
-                <div class="trend-item"><span class="trend-label">当前价格</span><span class="trend-value" id="currentPrice">0.01700 U</span></div>
-                <div class="trend-item"><span class="trend-label">每日涨幅</span><span class="trend-value" id="dailyIncrease">+0.39%</span></div>
-                <div class="trend-item"><span class="trend-label">已售 / 总量</span><span class="trend-value" id="soldProgress">2,941 / 21,000,000</span></div>
+                <div class="trend-item"><span class="trend-label">当前价格</span><span class="trend-value" id="currentPrice">-- U</span></div>
+                <div class="trend-item"><span class="trend-label">每日涨幅</span><span class="trend-value" id="dailyIncrease">--</span></div>
+                <div class="trend-item"><span class="trend-label">已售 / 总量</span><span class="trend-value" id="soldProgress">-- / 21,000,000</span></div>
             </div>
         </div>
 
@@ -89,7 +89,7 @@
                 <div class="info-row"><span class="info-label">预计获得</span><span class="info-value info-highlight" id="presaleExpected">-- NNB</span></div>
                 <div class="info-row"><span class="info-label">矿机释放基数 (3x)</span><span class="info-value info-highlight" id="presaleRelease">-- NNB</span></div>
                 <div class="info-row"><span class="info-label">每日释放预估</span><span class="info-value" id="presaleDaily">-- NNB/天</span></div>
-                <div class="info-row"><span class="info-label">USDT余额</span><span class="info-value">1,056.75 USDT</span></div>
+                <div class="info-row"><span class="info-label">USDT余额</span><span class="info-value">-- USDT</span></div>
                 <button class="btn-primary btn-block" onclick="demoBuy()"><i class="ph-fill ph-shopping-cart"></i> 购买矿机</button>
             </div>
         </div>
@@ -110,13 +110,13 @@
                 </div>
                 <div class="info-row"><span class="info-label">预计获得</span><span class="info-value info-highlight" id="buyExpected">-- NNB</span></div>
                 <div class="info-row"><span class="info-label">手续费</span><span class="info-value">0%</span></div>
-                <button class="btn-primary btn-block" onclick="demoToast('买入成功（演示）')"><i class="ph-fill ph-shopping-cart"></i> 买入</button>
+                <button class="btn-primary btn-block" onclick="buyNNB()"><i class="ph-fill ph-shopping-cart"></i> 买入</button>
             </div>
 
             <!-- 卖出挂单 -->
             <div class="info-card">
                 <div class="card-header"><span><i class="ph-fill ph-arrow-up-right"></i> 挂单卖出</span></div>
-                <div class="info-row"><span class="info-label">NNB余额</span><span class="info-value info-highlight">18,497.56 NNB</span></div>
+                <div class="info-row"><span class="info-label">NNB余额</span><span class="info-value info-highlight">-- NNB</span></div>
                 <div class="input-group">
                     <label>卖出数量 (NNB)</label>
                     <div class="input-with-suffix">
@@ -127,16 +127,16 @@
                 <div class="info-row"><span class="info-label">预计获得</span><span class="info-value" id="sellExpected">-- USDT</span></div>
                 <div class="info-row"><span class="info-label">手续费(10%)</span><span class="info-value" style="color:#ef4444" id="sellFee">-- NNB</span></div>
                 <div class="info-row"><span class="info-label">实际挂卖</span><span class="info-value info-highlight" id="sellActual">-- NNB</span></div>
-                <button class="btn-primary btn-block" onclick="demoToast('挂单成功，等待买家（演示）')"><i class="ph-fill ph-paper-plane"></i> 挂单卖出</button>
+                <button class="btn-primary btn-block" onclick="createSellOrder()"><i class="ph-fill ph-paper-plane"></i> 挂单卖出</button>
             </div>
 
             <!-- 挂单列表 -->
             <div class="info-card">
-                <div class="card-header"><span>挂单列表</span><span class="info-value">3 笔</span></div>
+                <div class="card-header"><span>挂单列表</span><span class="info-value">0 笔</span></div>
                 <div class="order-list">
-                    <div class="order-item"><div><div class="order-addr">0x44a1...F126</div><div class="order-time">2小时前</div></div><div class="order-amt">800 NNB</div><div class="order-status status-pending">排队中</div></div>
-                    <div class="order-item"><div><div class="order-addr">0xdF0c...4fcA</div><div class="order-time">5小时前</div></div><div class="order-amt">140 NNB</div><div class="order-status status-pending">排队中</div></div>
-                    <div class="order-item"><div><div class="order-addr">0x7C89...2525</div><div class="order-time">8小时前</div></div><div class="order-amt">1,800 NNB</div><div class="order-status status-pending">排队中</div></div>
+                    <div class="order-item"><div><div class="order-addr">0x44a1...F126</div><div class="order-time">--</div></div><div class="order-amt">-- NNB</div><div class="order-status status-pending">排队中</div></div>
+                    <div class="order-item"><div><div class="order-addr">0xdF0c...4fcA</div><div class="order-time">--</div></div><div class="order-amt">-- NNB</div><div class="order-status status-pending">排队中</div></div>
+                    <div class="order-item"><div><div class="order-addr">0x7C89...2525</div><div class="order-time">--</div></div><div class="order-amt">1,-- NNB</div><div class="order-status status-pending">排队中</div></div>
                 </div>
             </div>
 
@@ -154,22 +154,22 @@
             <div class="section-title-bar"><h2>矿机</h2><p>查看矿机状态和释放进度</p></div>
             <div class="info-card">
                 <div class="card-header"><span>我的矿机</span><span class="status-badge status-active">运行中</span></div>
-                <div class="info-row"><span class="info-label">账户ID</span><span class="info-value">837264</span></div>
-                <div class="info-row"><span class="info-label">投入USDT</span><span class="info-value">5,000.00 USDT</span></div>
-                <div class="info-row"><span class="info-label">获得NNB</span><span class="info-value">294,117.65 NNB</span></div>
-                <div class="info-row"><span class="info-label">释放基数 (3x)</span><span class="info-value">882,352.94 NNB</span></div>
-                <div class="info-row"><span class="info-label">已释放</span><span class="info-value">19,058.82 NNB</span></div>
+                <div class="info-row"><span class="info-label">账户ID</span><span class="info-value" id="userId">--</span></div>
+                <div class="info-row"><span class="info-label">投入USDT</span><span class="info-value">-- USDT</span></div>
+                <div class="info-row"><span class="info-label">获得NNB</span><span class="info-value">-- NNB</span></div>
+                <div class="info-row"><span class="info-label">释放基数 (3x)</span><span class="info-value">-- NNB</span></div>
+                <div class="info-row"><span class="info-label">已释放</span><span class="info-value">-- NNB</span></div>
                 <div class="realtime-earn">
                     <div class="realtime-label"><i class="ph-fill ph-trend-up"></i> 实时收益</div>
-                    <div class="realtime-value" id="realtimeEarn">15247.06 NNB</div>
-                    <div class="realtime-persec" id="realtimePerSec">+0.11029412 NNB/秒</div>
+                    <div class="realtime-value" id="realtimeEarn">0.000000 NNB</div>
+                    <div class="realtime-persec" id="realtimePerSec">-- NNB/秒</div>
                 </div>
                 <div class="progress-bar-wrapper">
-                    <div class="progress-bar-track"><div class="progress-bar-fill" style="width: 2.16%"></div></div>
-                    <span class="progress-text">2.16%</span>
+                    <div class="progress-bar-track"><div class="progress-bar-fill" style="width: 0%"></div></div>
+                    <span class="progress-text">0%</span>
                 </div>
                 <div class="miner-actions">
-                    <button class="btn-action" onclick="demoToast('领取成功（演示）')"><i class="ph-fill ph-hand-coins"></i> <span>领取</span></button>
+                    <button class="btn-action" onclick="claimMining()"><i class="ph-fill ph-hand-coins"></i> <span>领取</span></button>
                     <button class="btn-action" onclick="openModal('reinvestModal')"><i class="ph-fill ph-arrow-clockwise"></i> <span>复投</span></button>
                     <button class="btn-action" onclick="openModal('transferModal')"><i class="ph-fill ph-arrows-left-right"></i> <span>划转</span></button>
                 </div>
@@ -182,15 +182,15 @@
 
             <div class="info-card earn-card">
                 <div class="earn-label">累计已领收益</div>
-                <div class="earn-value">19,058.82 NNB</div>
+                <div class="earn-value">-- NNB</div>
             </div>
 
             <div class="info-card">
                 <div class="card-header">钱包余额</div>
                 <div class="info-row"><span class="info-label">账户ID</span><span class="info-value info-highlight">837264</span></div>
-                <div class="info-row"><span class="info-label">NNB余额</span><span class="info-value info-highlight">18,497.56 NNB</span></div>
-                <div class="info-row"><span class="info-label">USDT余额</span><span class="info-value">1,056.75 USDT</span></div>
-                <div class="info-row"><span class="info-label">BNB余额</span><span class="info-value">0.046 BNB</span></div>
+                <div class="info-row"><span class="info-label">NNB余额</span><span class="info-value info-highlight">-- NNB</span></div>
+                <div class="info-row"><span class="info-label">USDT余额</span><span class="info-value">-- USDT</span></div>
+                <div class="info-row"><span class="info-label">BNB余额</span><span class="info-value">-- BNB</span></div>
             </div>
 
             <div class="info-card invite-card">
@@ -198,7 +198,7 @@
                 <div class="invite-code-row"><span class="invite-label">我的邀请码</span><span class="invite-code">E34A1B</span></div>
                 <div class="invite-link-row">
                     <div class="invite-link-text">https://152c38b7.strike-agent.com/?ref=0xE34A...1EF1</div>
-                    <button class="btn-copy-link" onclick="demoToast('链接已复制（演示）')"><i class="ph-fill ph-copy"></i> 复制推荐链接</button>
+                    <button class="btn-copy-link" onclick="copyInviteLink()"><i class="ph-fill ph-copy"></i> 复制推荐链接</button>
                 </div>
             </div>
 
@@ -210,13 +210,13 @@
             <div class="info-card">
                 <div class="card-header">绑定推荐人</div>
                 <div class="input-group"><input type="text" placeholder="输入推荐人地址或邀请码"></div>
-                <button class="btn-primary btn-block" onclick="demoToast('绑定成功（演示）')"><i class="ph-fill ph-link"></i> 绑定</button>
+                <button class="btn-primary btn-block" onclick="bindReferrer()"><i class="ph-fill ph-link"></i> 绑定</button>
             </div>
 
             <div class="info-card">
                 <div class="card-header">团队信息</div>
                 <div class="info-row"><span class="info-label">直推人数</span><span class="info-value">3</span></div>
-                <div class="info-row"><span class="info-label">个人矿机价值</span><span class="info-value">5,000.00 USD</span></div>
+                <div class="info-row"><span class="info-label">个人矿机价值</span><span class="info-value">-- USD</span></div>
                 <div class="info-row"><span class="info-label">伞下团队业绩</span><span class="info-value">430.00 USD</span></div>
                 <div class="info-row"><span class="info-label">享有代数</span><span class="info-value info-highlight">0 代</span></div>
             </div>
@@ -231,9 +231,10 @@
             <div class="info-card">
                 <div class="card-header"><span>直推明细</span><span class="info-value">直推 3 人</span></div>
                 <div class="direct-list">
-                    <div class="direct-list-item"><div><div class="direct-addr">0x44a1...F126</div><div class="direct-time">ID 491837</div></div><div class="direct-usd">100.00 USD</div></div>
-                    <div class="direct-list-item"><div><div class="direct-addr">0x5B33...D81a</div><div class="direct-time">ID 602741</div></div><div class="direct-usd">100.00 USD</div></div>
-                    <div class="direct-list-item"><div><div class="direct-addr">0x2081...368</div><div class="direct-time">ID 915386</div></div><div class="direct-usd">200.00 USD</div></div>
+                    <div class="empty-state">
+                        <i class="ph ph-users"></i>
+                        <p>您还没有直推用户</p>
+                    </div>
                 </div>
             </div>
 
@@ -242,11 +243,11 @@
                 <div class="card-header">节点</div>
                 <div class="info-row"><span class="info-label">我的节点</span><span class="info-value">未购买</span></div>
                 <div class="info-row"><span class="info-label">可领分红</span><span class="info-value">-- NNB</span></div>
-                <div class="info-row"><span class="info-label">普通节点已售</span><span class="info-value">2 / 1000</span></div>
-                <div class="info-row"><span class="info-label">超级节点已售</span><span class="info-value">1 / 500</span></div>
+                <div class="info-row"><span class="info-label">普通节点已售</span><span class="info-value" id="normalSold">0 / 1000</span></div>
+                <div class="info-row"><span class="info-label">超级节点已售</span><span class="info-value" id="superSold">0 / 500</span></div>
                 <div class="node-buttons">
-                    <button class="btn-action btn-normal" onclick="demoToast('购买成功（演示）')"><i class="ph-fill ph-medal"></i> <span>普通 500U</span></button>
-                    <button class="btn-action btn-super" onclick="demoToast('购买成功（演示）')"><i class="ph-fill ph-crown"></i> <span>超级 1000U</span></button>
+                    <button class="btn-action btn-normal" onclick="buyNormalNode()"><i class="ph-fill ph-medal"></i> <span>普通 500U</span></button>
+                    <button class="btn-action btn-super" onclick="buyNormalNode()"><i class="ph-fill ph-crown"></i> <span>超级 1000U</span></button>
                 </div>
                 <button class="btn-primary btn-block" disabled style="margin-top:8px"><i class="ph-fill ph-hand-coins"></i> 领取节点分红</button>
             </div>
@@ -259,8 +260,8 @@
         <div class="lang-modal-content">
             <div class="lang-modal-header"><span class="lang-modal-title">复投</span><button class="lang-close" onclick="closeModal('reinvestModal')"><i class="ph ph-x"></i></button></div>
             <div class="action-card" style="border:none;background:transparent;box-shadow:none;padding:0;">
-                <div class="info-row"><span class="info-label">NNB余额</span><span class="info-value info-highlight">18,497.56 NNB</span></div>
-                <div class="info-row"><span class="info-label">余额折合</span><span class="info-value" id="reinvestBalUSD">314.46 USD</span></div>
+                <div class="info-row"><span class="info-label">NNB余额</span><span class="info-value info-highlight">-- NNB</span></div>
+                <div class="info-row"><span class="info-label">余额折合</span><span class="info-value" id="reinvestBalUSD">-- USD</span></div>
                 <div class="info-row"><span class="info-label">最低复投</span><span class="info-value">10.00 USD (588.24 NNB)</span></div>
                 <div class="input-group">
                     <label>复投金额 (NNB)</label>
@@ -269,7 +270,7 @@
                 <div class="info-row"><span class="info-label">复投折合</span><span class="info-value" id="reinvestUSD">-- USD</span></div>
                 <div class="info-row"><span class="info-label">新增释放基数(3x)</span><span class="info-value info-highlight" id="reinvestRelease">-- NNB</span></div>
                 <div class="info-row" id="reinvestWarn" style="display:none"><span class="info-label" style="color:#ef4444">余额不足10U，无法复投</span></div>
-                <button class="btn-primary btn-block" id="reinvestBtn" onclick="demoToast('复投成功（演示）');closeModal('reinvestModal')"><i class="ph-fill ph-arrow-clockwise"></i> 确认复投</button>
+                <button class="btn-primary btn-block" id="reinvestBtn" onclick="doReinvest()"><i class="ph-fill ph-arrow-clockwise"></i> 确认复投</button>
             </div>
         </div>
     </div>
@@ -279,11 +280,11 @@
         <div class="lang-modal-content">
             <div class="lang-modal-header"><span class="lang-modal-title">划转</span><button class="lang-close" onclick="closeModal('transferModal')"><i class="ph ph-x"></i></button></div>
             <div class="action-card" style="border:none;background:transparent;box-shadow:none;padding:0;">
-                <div class="info-row"><span class="info-label">NNB余额</span><span class="info-value info-highlight">18,497.56 NNB</span></div>
-                <div class="info-row"><span class="info-label">余额折合</span><span class="info-value" id="transferBalUSD">314.46 USD</span></div>
+                <div class="info-row"><span class="info-label">NNB余额</span><span class="info-value info-highlight">-- NNB</span></div>
+                <div class="info-row"><span class="info-label">余额折合</span><span class="info-value" id="transferBalUSD">-- USD</span></div>
                 <div class="input-group">
                     <label>接收方（ID或地址）</label>
-                    <input type="text" placeholder="输入 491837 或 0x... 地址">
+                    <input type="text" placeholder="输入 ID 或 0x... 地址">
                 </div>
                 <div class="input-group">
                     <label>划转金额</label>
@@ -292,7 +293,7 @@
                 <div class="info-row"><span class="info-label">划转折合</span><span class="info-value" id="transferUSD">-- USD</span></div>
                 <div class="info-row"><span class="info-label">手续费</span><span class="info-value">0% (免费)</span></div>
                 <div class="info-row" id="transferWarn" style="display:none"><span class="info-label" style="color:#ef4444">余额不足，无法划转</span></div>
-                <button class="btn-primary btn-block" id="transferBtn" onclick="demoToast('划转成功（演示）');closeModal('transferModal')"><i class="ph-fill ph-paper-plane"></i> 确认划转</button>
+                <button class="btn-primary btn-block" id="transferBtn" onclick="doTransfer()"><i class="ph-fill ph-paper-plane"></i> 确认划转</button>
             </div>
         </div>
     </div>
@@ -308,157 +309,6 @@
 
     <div id="toast" class="toast"></div>
 
-    <script>
-    // 页面切换
-    function switchPage(page) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
-        document.getElementById('page-' + page).classList.add('page-active');
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('nav-active'));
-        event.currentTarget.classList.add('nav-active');
-    }
-
-    // Toast
-    function demoToast(msg) {
-        const t = document.getElementById('toast');
-        t.textContent = msg;
-        t.className = 'toast show success';
-        setTimeout(() => t.className = 'toast', 1500);
-    }
-
-    // 弹窗
-    function openModal(id) { document.getElementById(id).classList.add('show'); }
-    function closeModal(id, e) { if (e && e.target.id !== id) return; document.getElementById(id).classList.remove('show'); }
-
-    // 预售计算
-    function calcPresale() {
-        const usdt = parseFloat(document.getElementById('presaleAmount').value) || 0;
-        if (usdt <= 0) return;
-        const price = 0.017;
-        const nnb = usdt / price;
-        const release = nnb * 3;
-        let rate = 0.009;
-        if (usdt >= 200000) rate = 0.018;
-        else if (usdt >= 50000) rate = 0.015;
-        else if (usdt >= 10000) rate = 0.0117;
-        else if (usdt >= 1000) rate = 0.0108;
-        else if (usdt >= 100) rate = 0.0099;
-        document.getElementById('presaleExpected').textContent = nnb.toFixed(2) + ' NNB';
-        document.getElementById('presaleRelease').textContent = release.toFixed(2) + ' NNB';
-        document.getElementById('presaleDaily').textContent = (release * rate).toFixed(2) + ' NNB/天';
-    }
-
-    function demoBuy() { demoToast('购买成功（演示）'); document.getElementById('presaleAmount').value = ''; }
-
-    // 价格涨幅浮动 0.39-0.42循环
-    const increaseCycle = [0.39, 0.40, 0.41, 0.42];
-    const dayIndex = Math.floor((Date.now() / 86400000)) % increaseCycle.length;
-    const todayIncrease = increaseCycle[dayIndex];
-    const incEl = document.getElementById('dailyIncrease');
-    if (incEl) incEl.textContent = '+' + todayIncrease.toFixed(2) + '%';
-
-    // 实时收益跳动
-    let earnBase = 15247.06;
-    const perSec = 9529.41 / 86400;
-    setInterval(() => {
-        earnBase += perSec;
-        const el = document.getElementById('realtimeEarn');
-        if (el) el.textContent = earnBase.toFixed(6) + ' NNB';
-    }, 1000);
-
-    // 网体详情 1-19代（人数 + 金额）
-    const genData = [
-        {count: 3, usd: 230.00},
-        {count: 5, usd: 150.00},
-        {count: 2, usd: 50.00},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-        {count: 0, usd: 0},
-    ];
-    const genGrid = document.getElementById('genGrid');
-    if (genGrid) {
-        genGrid.innerHTML = genData.map((data, i) => {
-            const has = data.count > 0;
-            const cls = has ? 'gen-item gen-has' : 'gen-item';
-            return '<div class="' + cls + '"><div class="gen-num">第' + (i+1) + '代</div><div class="gen-count">' + data.count + '人</div><div class="gen-usd">' + (data.usd > 0 ? data.usd.toFixed(0) + 'U' : '-') + '</div></div>';
-        }).join('');
-    }
-
-    // 卖出计算
-    document.addEventListener('input', function(e) {
-        if (e.target.id === 'sellAmount') {
-            const nnb = parseFloat(e.target.value) || 0;
-            const price = 0.017;
-            const usdt = nnb * price;
-            const fee = nnb * 0.1;
-            const actual = nnb - fee;
-            document.getElementById('sellExpected').textContent = (actual * price).toFixed(2) + ' USDT';
-            document.getElementById('sellFee').textContent = fee.toFixed(2) + ' NNB';
-            document.getElementById('sellActual').textContent = actual.toFixed(2) + ' NNB';
-        }
-        if (e.target.id === 'buyAmount') {
-            const usdt = parseFloat(e.target.value) || 0;
-            document.getElementById('buyExpected').textContent = (usdt / 0.017).toFixed(2) + ' NNB';
-        }
-    });
-
-    // 复投计算
-    function calcReinvest() {
-        const event = window.event;
-        const nnb = parseFloat(event.target.value) || 0;
-        const usd = nnb * 0.017;
-        const balance = 18497.56;
-        const minNNB = 10 / 0.017; // 最低10U等值NNB
-        
-        document.getElementById('reinvestUSD').textContent = usd.toFixed(2) + ' USD';
-        document.getElementById('reinvestRelease').textContent = (nnb * 3).toFixed(2) + ' NNB';
-        
-        // 检查余额和最低门槛
-        const warn = document.getElementById('reinvestWarn');
-        const btn = document.getElementById('reinvestBtn');
-        if (nnb > 0 && (usd < 10 || nnb > balance)) {
-            warn.style.display = 'flex';
-            warn.querySelector('span').textContent = usd < 10 ? '不足10U，无法复投（最低' + minNNB.toFixed(2) + ' NNB）' : '余额不足';
-            btn.disabled = true;
-        } else {
-            warn.style.display = 'none';
-            btn.disabled = nnb <= 0;
-        }
-    }
-
-    // 划转计算
-    function calcTransfer() {
-        const event = window.event;
-        const nnb = parseFloat(event.target.value) || 0;
-        const usd = nnb * 0.017;
-        const balance = 18497.56;
-        
-        document.getElementById('transferUSD').textContent = usd.toFixed(2) + ' USD';
-        
-        const warn = document.getElementById('transferWarn');
-        const btn = document.getElementById('transferBtn');
-        if (nnb > balance) {
-            warn.style.display = 'flex';
-            btn.disabled = true;
-        } else {
-            warn.style.display = 'none';
-            btn.disabled = nnb <= 0;
-        }
-    }
-    </script>
-<script src="config.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=20260729"></script>
 </body>
 </html>
