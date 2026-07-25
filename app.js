@@ -1,21 +1,19 @@
-// ========== 牛牛币 NNB DApp 交互逻辑 v3 (无ethers依赖) ==========
+// ========== 牛牛币 NNB DApp v3 (无ethers依赖) ==========
 
-let account = null;
-let ethereum = null;
-let isConnected = false;
+var account = null;
+var eth = null;
+var connected = false;
 
-// 合约地址
-const CONTRACTS = {
-    token: '0x02506bb817808C84960Dae891C6626afbecC4Ce8',
-    mining: '0x5D89781b521f7e06A54D5A9793058b36217300e1',
-    dynamic: '0xF0Dfd18ADAee644cbe440DA1AdEd930c71097886',
+var CONTRACTS = {
+    token: '0x314C67DeAC6F50C3D386Fc0a1d1a3B667dCd2a81',
+    mining: '0x18bfe1E0F5ac700f6fD0f2552Eb5F61af8E0C40d',
+    dynamic: '0x1aD7088A3A155c377BF203d60b391Bd288B08416',
     node: '0x099ce609a02d4a848F5553d8E5AC32Fc72E4Ef8a',
     trade: '0x580CF0bea642350358cB26Bd21EE0D7e420D82c5',
-    usdt: '0x55d398326f99059fF775485246999027B3197955',
+    usdt: '0x55d398326f99059fF775485246999027B3197955'
 };
 
-const CHAIN_ID = '0x38';
-
+// ========== 工具 ==========
 function showToast(msg, type) {
     var t = document.getElementById('toast');
     if (!t) return;
@@ -25,42 +23,79 @@ function showToast(msg, type) {
     t._timer = setTimeout(function() { t.className = 'toast'; }, type === 'success' ? 800 : 3000);
 }
 
-function shortenAddr(addr) {
-    if (!addr || addr.length < 10) return addr;
-    return addr.slice(0, 6) + '...' + addr.slice(-4);
-}
-
-function toHex(num) {
-    return '0x' + BigInt(num).toString(16);
-}
-
-function fromHex(hex) {
-    return parseInt(hex, 16);
-}
+function shortenAddr(a) { return a && a.length > 10 ? a.slice(0,6)+'...'+a.slice(-4) : a; }
 
 function toWei(amount) {
-    var parts = amount.toString().split('.');
+    var s = amount.toString();
+    var parts = s.split('.');
     var whole = parts[0] || '0';
     var frac = parts[1] || '';
     while (frac.length < 18) frac += '0';
     frac = frac.slice(0, 18);
-    return (BigInt(whole) * BigInt('1000000000000000000') + BigInt(frac || '0')).toString();
+    return (BigInt(whole) * BigInt(10**18) + BigInt(frac || '0')).toString(16);
 }
 
-function fromWei(weiStr) {
-    // 兼容hex和十进制
-    if (typeof weiStr === 'string' && weiStr.startsWith('0x')) {
-        weiStr = BigInt(weiStr).toString();
+function fromWei(hex) {
+    if (typeof hex !== 'string') hex = String(hex);
+    if (hex.startsWith('0x')) hex = hex.slice(2);
+    if (!hex) return 0;
+    var val = BigInt('0x' + hex);
+    var whole = val / BigInt(10**18);
+    var frac = val % BigInt(10**18);
+    var fs = frac.toString().padStart(18, '0').replace(/0+$/, '').slice(0, 6);
+    return parseFloat(whole.toString() + (fs ? '.' + fs : ''));
+}
+
+function hexToInt(hex) {
+    if (typeof hex !== 'string') hex = String(hex);
+    if (hex.startsWith('0x')) hex = hex.slice(2);
+    if (!hex) return 0;
+    return parseInt(hex, 16);
+}
+
+function padAddr(addr) {
+    return '000000000000000000000000' + addr.slice(2).toLowerCase();
+}
+
+// ========== RPC ==========
+async function rpcRead(to, data) {
+    if (!eth) throw '钱包未连接';
+    return await eth.request({
+        method: 'eth_call',
+        params: [{ from: account || '0x0000000000000000000000000000000000000000', to: to, data: data }, 'latest']
+    });
+}
+
+async function rpcWrite(to, data) {
+    if (!eth || !account) throw '钱包未连接';
+    // 先估算Gas
+    var gasHex = '0x' + (300000).toString(16);
+    try {
+        var estimated = await eth.request({
+            method: 'eth_estimateGas',
+            params: [{ from: account, to: to, data: data }]
+        });
+        if (estimated && parseInt(estimated, 16) > 21000) {
+            gasHex = '0x' + (parseInt(estimated, 16) * 2).toString(16);
+        }
+    } catch(e) {}
+    var txHash = await eth.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: account, to: to, data: data, gas: gasHex }]
+    });
+    // 等待确认
+    for (var i = 0; i < 30; i++) {
+        try {
+            var receipt = await eth.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
+            if (receipt) {
+                if (receipt.status === '0x0') throw '交易失败';
+                return receipt;
+            }
+        } catch(e) {}
+        await new Promise(function(r) { setTimeout(r, 3000); });
     }
-    var wei = BigInt(weiStr);
-    var whole = wei / BigInt('1000000000000000000');
-    var frac = wei % BigInt('1000000000000000000');
-    var fracStr = frac.toString().padStart(18, '0');
-    fracStr = fracStr.replace(/0+$/, '').slice(0, 6);
-    if (fracStr) {
-        return parseFloat(whole.toString() + '.' + fracStr);
-    }
-    return parseFloat(whole.toString());
+    // 超时报错
+    throw '交易超时，请检查链上状态';
 }
 
 // ========== 页面切换 ==========
@@ -71,208 +106,361 @@ function switchPage(page) {
     if (event && event.currentTarget) event.currentTarget.classList.add('nav-active');
 }
 
-// ========== 弹窗 ==========
-function openModal(id) { var m = document.getElementById(id); if (m) m.classList.add('show'); }
-function closeModal(id, e) { if (e && e.target.id !== id) return; var m = document.getElementById(id); if (m) m.classList.remove('show'); }
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id, e) { if (e && e.target.id !== id) return; document.getElementById(id).classList.remove('show'); }
 
 // ========== 连接钱包 ==========
 async function connectWallet() {
-    ethereum = window.ethereum;
-    if (!ethereum) {
-        if (window.bsc && window.bsc.BinanceChain) ethereum = window.bsc.BinanceChain;
-    }
-    if (!ethereum) {
-        showToast('请用TB钱包DApp浏览器打开', 'error');
-        return;
-    }
+    eth = window.ethereum;
+    if (!eth && window.bsc) eth = window.bsc.BinanceChain;
+    if (!eth) { showToast('请用TB钱包打开', 'error'); return; }
 
     try {
-        var accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+        var accounts = await eth.request({ method: 'eth_requestAccounts' });
         account = accounts[0];
 
-        var chainId = await ethereum.request({ method: 'eth_chainId' });
-        if (chainId !== CHAIN_ID) {
+        // 签名验证
+        var signMsg = 'NNB Login: ' + Math.floor(Date.now() / 1000);
+        try {
+            await eth.request({ method: 'personal_sign', params: [signMsg, account] });
+        } catch(e) {
+            showToast('需要确认签名才能登录', 'error');
+            account = null;
+            connected = false;
+            return;
+        }
+
+        connected = true;
+
+        // 切换到BSC
+        var chainId = await eth.request({ method: 'eth_chainId' });
+        if (chainId !== '0x38') {
             try {
-                await ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_ID }] });
-            } catch (e) {
-                await ethereum.request({
+                await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x38' }] });
+            } catch(e) {
+                await eth.request({
                     method: 'wallet_addEthereumChain',
-                    params: [{ chainId: CHAIN_ID, chainName: 'BNB Smart Chain', rpcUrls: ['https://bsc-dataseed.binance.org/'], blockExplorerUrls: ['https://bscscan.com'], nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 } }]
+                    params: [{ chainId: '0x38', chainName: 'BNB Smart Chain', rpcUrls: ['https://bsc-dataseed.binance.org/'], blockExplorerUrls: ['https://bscscan.com'], nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 } }]
                 });
             }
         }
 
-        isConnected = true;
         var btn = document.getElementById('connectBtn');
-        if (btn) {
-            btn.classList.add('connected');
-            btn.innerHTML = '<i class="ph-fill ph-check-circle"></i> ' + shortenAddr(account);
-        }
+        btn.classList.add('connected');
+        btn.innerHTML = '<i class="ph-fill ph-check-circle"></i> ' + shortenAddr(account);
         showToast('钱包已连接', 'success');
-        // 500毫秒后强制隐藏
-        setTimeout(function() { var t = document.getElementById('toast'); if (t) t.className = 'toast'; }, 500);
+        // 只有推荐人钱包才显示推荐链接
+        var REFERRER_WALLET = '0x1070fd57edc76b3b61d71d50081ca5fe8a65e6b1';
+        if (account.toLowerCase() === REFERRER_WALLET) {
+            var link = location.origin + location.pathname + '?ref=' + account;
+            setText('refLinkText', link);
+            if (account) setText('inviteCode', account.slice(2, 8).toUpperCase());
+        } else {
+            // 非推荐人钱包，检查是否已绑定推荐人
+            try {
+                var refResult = await rpcRead(CONTRACTS.dynamic, '0x2cf003c2' + padAddr(account));
+                var currentRef = '0x' + refResult.slice(26, 66);
+                if (currentRef !== '0x0000000000000000000000000000000000000000') {
+                    // 已绑定，显示自己的推荐链接
+                    var link2 = location.origin + location.pathname + '?ref=' + account;
+                    setText('refLinkText', link2);
+                    if (account) setText('inviteCode', account.slice(2, 8).toUpperCase());
+                } else {
+                    // 未绑定，不显示推荐链接
+                    setText('refLinkText', '请先绑定推荐人');
+                    setText('inviteCode', '--');
+                }
+            } catch(e) {
+                setText('refLinkText', '请先绑定推荐人');
+                setText('inviteCode', '--');
+            }
+        }
+        // 显示账户ID
+        try { var uid = hexToInt(await rpcRead(CONTRACTS.mining, '0x2b956ff7' + padAddr(account))); setText('userId', uid || '--'); setText('assetsUserId', uid || '--'); setText('mineUserId', uid || '--'); } catch(e) {}
+
+        // 检查推荐链接 → 自动绑定
+        var ref = new URLSearchParams(window.location.search).get('ref');
+        if (ref && ref.startsWith('0x')) {
+            await autoBindReferrer(ref);
+        }
+
         await loadAllData();
-    } catch (err) {
+    } catch(err) {
         showToast('连接失败: ' + (err.message || err), 'error');
     }
 }
 
-// ========== RPC调用 ==========
-async function rpcCall(to, data, isWrite) {
-    if (isWrite) {
-        var tx = await ethereum.request({
-            method: 'eth_sendTransaction',
-            params: [{ from: account, to: to, data: data }]
-        });
-        // 等待交易确认
-        var receipt = null;
-        for (var i = 0; i < 30; i++) {
-            try {
-                receipt = await ethereum.request({ method: 'eth_getTransactionReceipt', params: [tx] });
-                if (receipt) break;
-            } catch(e) {}
-            await new Promise(function(r) { setTimeout(r, 2000); });
+// ========== 自动绑定推荐关系 ==========
+async function autoBindReferrer(refAddr) {
+    try {
+        // 先检查是否已绑定
+        var refResult = await rpcRead(CONTRACTS.dynamic, '0x2cf003c2' + padAddr(account));
+        var currentRef = '0x' + refResult.slice(26, 66);
+        if (currentRef !== '0x0000000000000000000000000000000000000000') {
+            return; // 已绑定，不重复
         }
-        return receipt;
-    } else {
-        var result = await ethereum.request({
-            method: 'eth_call',
-            params: [{ from: account || '0x0000000000000000000000000000000000000000', to: to, data: data }, 'latest']
-        });
-        return result;
+        // 自动发起绑定
+        showToast('正在绑定推荐关系...', '');
+        var userParam = padAddr(account);
+        var refParam = refAddr.slice(2).toLowerCase().padStart(64, '0');
+        await rpcWrite(CONTRACTS.dynamic, '0x5603b9f9' + userParam + refParam);
+        showToast('推荐关系绑定成功', 'success');
+        setTimeout(function() { var t = document.getElementById('toast'); if (t) t.className = 'toast'; }, 2000);
+    } catch(err) {
+        showToast('绑定失败: ' + (err.message || err), 'error');
     }
 }
 
 // ========== 加载数据 ==========
 async function loadAllData() {
-    if (!isConnected) return;
-    try { await loadPriceAndSupply(); } catch(e) { console.error('price', e); }
-    try { await loadWalletBalance(); } catch(e) { console.error('wallet', e); }
-    try { await loadMinerInfo(); } catch(e) { console.error('miner', e); }
-    try { await loadTeamInfo(); } catch(e) { console.error('team', e); }
+    if (!connected) return;
+    try { await loadPrice(); } catch(e) {}
+    try { await loadBalances(); } catch(e) {}
+    try { await loadMiner(); } catch(e) {}
+    try { await loadTeam(); } catch(e) {}
+    try { await loadNode(); } catch(e) {}
 }
 
-async function loadPriceAndSupply() {
-    var priceResult = await rpcCall(CONTRACTS.mining, '0xbd94ad84'); // nnbPrice()
-    var price = fromWei(priceResult);
-    var el = document.getElementById('topPrice'); if (el) el.textContent = price.toFixed(5) + ' U';
-    el = document.getElementById('currentPrice'); if (el) el.textContent = price.toFixed(5) + ' U';
-    el = document.getElementById('presalePrice'); if (el) el.textContent = price.toFixed(5) + ' U';
+async function loadPrice() {
+    var price = fromWei(await rpcRead(CONTRACTS.mining, '0x61703b0a'));
+    setText('topPrice', price.toFixed(5) + ' U');
+    setText('currentPrice', price.toFixed(5) + ' U');
+    setText('presalePrice', price.toFixed(5) + ' U');
 
-    var soldResult = await rpcCall(CONTRACTS.mining, '0xe5e16551'); // totalSold()
-    var sold = fromWei(soldResult);
-    var maxResult = await rpcCall(CONTRACTS.mining, '0xd5b13967'); // maxSupply()
-    var maxNum = fromWei(maxResult);
-    el = document.getElementById('soldProgress'); if (el) el.textContent = sold.toFixed(0) + ' / ' + maxNum.toFixed(0);
-    el = document.getElementById('presaleRemaining'); if (el) el.textContent = (maxNum - sold).toFixed(0) + ' NNB';
+    var sold = fromWei(await rpcRead(CONTRACTS.mining, '0x9106d7ba'));
+    var max = fromWei(await rpcRead(CONTRACTS.mining, '0xd5abeb01'));
+    setText('soldProgress', sold.toFixed(0) + ' / ' + max.toFixed(0));
+    setText('presaleRemaining', (max - sold).toFixed(0) + ' NNB');
+    var pct = max > 0 ? (sold / max * 100) : 0;
+    document.getElementById('presaleBar').style.width = pct.toFixed(2) + '%';
+    setText('presalePercent', pct.toFixed(2) + '%');
+
+    // 价格涨幅（前端浮动显示）
+    var cycle = [0.39, 0.40, 0.41, 0.42];
+    var dayIdx = Math.floor(Date.now() / 86400000) % cycle.length;
+    setText('dailyIncrease', '+' + cycle[dayIdx].toFixed(2) + '%');
 }
 
-async function loadWalletBalance() {
-    // balanceOf(address)
-    var addrParam = '000000000000000000000000' + account.slice(2).toLowerCase();
-    var data = '0x70a08231' + addrParam;
+async function loadBalances() {
+    var nnb = fromWei(await rpcRead(CONTRACTS.token, '0x70a08231' + padAddr(account)));
+    var usdt = fromWei(await rpcRead(CONTRACTS.usdt, '0x70a08231' + padAddr(account)));
+    var bnb = fromWei(await eth.request({ method: 'eth_getBalance', params: [account, 'latest'] }));
 
-    var nnbResult = await rpcCall(CONTRACTS.token, data);
-    var nnbBal = fromWei(nnbResult);
-    var el = document.getElementById('nnbBalance'); if (el) el.textContent = nnbBal.toFixed(6) + ' NNB';
-
-    var usdtResult = await rpcCall(CONTRACTS.usdt, data);
-    var usdtBal = fromWei(usdtResult);
-    el = document.getElementById('usdtBalance'); if (el) el.textContent = usdtBal.toFixed(2) + ' USDT';
-    el = document.getElementById('assetsUsdtBal'); if (el) el.textContent = usdtBal.toFixed(2) + ' USDT';
+    setText('nnbBalance', nnb.toFixed(6) + ' NNB');
+    setText('assetsUsdtBal', usdt.toFixed(2) + ' USDT');
+    setText('presaleUsdtBal', usdt.toFixed(2) + ' USDT');
+    setText('tradeUsdtBal', usdt.toFixed(2) + ' USDT');
+    setText('tradeNnbBal', nnb.toFixed(2) + ' NNB');
+    setText('bnbBalance', bnb.toFixed(4) + ' BNB');
+    setText('reinvestBalance', nnb.toFixed(2) + ' NNB');
+    setText('reinvestBalUSD', (nnb * 0.017).toFixed(2) + ' USD');
+    setText('transferBalance', nnb.toFixed(2) + ' NNB');
 }
 
-async function loadMinerInfo() {
-    var addrParam = '000000000000000000000000' + account.slice(2).toLowerCase();
-    var data = '0x6a1e1e37' + addrParam; // getMinerInfo(address)
-    var result = await rpcCall(CONTRACTS.mining, data);
-
-    // 解析返回值（7个uint256）
-    var usdtInvested = fromWei('0x' + result.slice(2, 66));
-    var nnbAmount = fromWei('0x' + result.slice(66, 130));
-    var totalRelease = fromWei('0x' + result.slice(130, 194));
+async function loadMiner() {
+    var result = await rpcRead(CONTRACTS.mining, '0x0b34d553' + padAddr(account));
+    var usdt = fromWei('0x' + result.slice(2, 66));
+    var nnb = fromWei('0x' + result.slice(66, 130));
+    var total = fromWei('0x' + result.slice(130, 194));
     var released = fromWei('0x' + result.slice(194, 258));
     var pending = fromWei('0x' + result.slice(258, 322));
-    var activeHex = '0x' + result.slice(322, 386);
-    var isActive = parseInt(activeHex, 16) === 1;
+    var active = hexToInt('0x' + result.slice(322, 386)) === 1 || hexToInt('0x' + result.slice(322, 386)) > 0;
 
-    var el;
-    el = document.getElementById('minerUsdt'); if (el) el.textContent = usdtInvested.toFixed(2) + ' USDT';
-    el = document.getElementById('minerNnb'); if (el) el.textContent = nnbAmount.toFixed(2) + ' NNB';
-    el = document.getElementById('minerTotal'); if (el) el.textContent = totalRelease.toFixed(2) + ' NNB';
-    el = document.getElementById('minerReleased'); if (el) el.textContent = released.toFixed(6) + ' NNB';
+    setText('minerUsdt', usdt.toFixed(2) + ' USDT');
+    setText('minerNnb', nnb.toFixed(2) + ' NNB');
+    setText('minerTotal', total.toFixed(2) + ' NNB');
+    setText('minerReleased', released.toFixed(6) + ' NNB');
 
     var status = document.getElementById('minerStatus');
-    if (status) {
-        if (isActive) { status.textContent = '运行中'; status.className = 'status-badge status-active'; }
-        else { status.textContent = '未激活'; status.className = 'status-badge status-inactive'; }
-    }
+    if (active) { status.textContent = '运行中'; status.className = 'status-badge status-active'; }
+    else { status.textContent = '未激活'; status.className = 'status-badge status-inactive'; }
+
+    // ID
+    try {
+        var uid = hexToInt(await rpcRead(CONTRACTS.mining, '0x2b956ff7' + padAddr(account)));
+        setText('mineUserId', uid || '--');
+        setText('assetsUserId', uid || '--');
+        setText('userId', uid || '--');
+        setText('inviteCode', uid || '--');
+    } catch(e) {}
 
     // 实时收益
-    if (isActive && totalRelease > 0) {
-        var dailyRate = 0.009;
-        if (usdtInvested >= 200000) dailyRate = 0.018;
-        else if (usdtInvested >= 50000) dailyRate = 0.015;
-        else if (usdtInvested >= 10000) dailyRate = 0.0117;
-        else if (usdtInvested >= 1000) dailyRate = 0.0108;
-        else if (usdtInvested >= 100) dailyRate = 0.0099;
+    if (active && total > 0) {
+        var rate = 0.009;
+        if (usdt >= 200000) rate = 0.018;
+        else if (usdt >= 50000) rate = 0.015;
+        else if (usdt >= 10000) rate = 0.0117;
+        else if (usdt >= 1000) rate = 0.0108;
+        else if (usdt >= 100) rate = 0.0099;
 
-        var remaining = totalRelease - released;
-        var dailyAmount = remaining * dailyRate;
-        var perSec = dailyAmount / 86400;
+        var remaining = total - released;
+        var daily = remaining * rate;
+        var perSec = daily / 86400;
 
-        el = document.getElementById('realtimePerSec'); if (el) el.textContent = '+' + perSec.toFixed(8) + ' NNB/秒';
+        setText('realtimePerSec', '+' + perSec.toFixed(8) + ' NNB/秒');
 
-        // 启动实时跳动
-        var basePending = pending;
-        var startTime = Date.now();
-        clearInterval(window._earnTimer);
-        window._earnTimer = setInterval(function() {
-            var elapsed = (Date.now() - startTime) / 1000;
-            var realtime = basePending + perSec * elapsed;
-            var e = document.getElementById('realtimeEarn'); if (e) e.textContent = realtime.toFixed(6) + ' NNB';
-            e = document.getElementById('minerPending'); if (e) e.textContent = realtime.toFixed(6) + ' NNB';
-            e = document.getElementById('nnbBalance'); if (e) e.textContent = (fromWei(nnbResult) + realtime).toFixed(6) + ' NNB';
+        clearInterval(window._timer);
+        // base = 链上待领取 + 从上次结算到现在的未结算释放量
+        // 读取矿机激活时间计算已过多少秒
+        var activatedAt = hexToInt('0x' + result.slice(386, 450));
+        var now = Math.floor(Date.now() / 1000);
+        var totalElapsed = now - activatedAt;
+        // 从激活到现在的总释放量（递减计算）
+        var simulatedRemaining = total;
+        var totalReleased = 0;
+        var daysPassed = Math.floor(totalElapsed / 86400);
+        var extraSeconds = totalElapsed % 86400;
+        // 按天递减计算
+        for (var d = 0; d < daysPassed; d++) {
+            var dayRelease = simulatedRemaining * rate;
+            totalReleased += dayRelease;
+            simulatedRemaining -= dayRelease;
+        }
+        // 今天的部分（按秒计算）
+        var todayRelease = simulatedRemaining * rate * (extraSeconds / 86400);
+        totalReleased += todayRelease;
+        // 个人80%
+        var personalReleased = totalReleased * 0.8;
+        // base = 链上已结算的待领取 + 未结算的个人部分
+        var base = pending + (personalReleased - pending);
+        if (base < 0) base = 0;
+        var start = Date.now();
+        window._timer = setInterval(function() {
+            var elapsed = (Date.now() - start) / 1000;
+            var val = base + perSec * elapsed;
+            setText('realtimeEarn', val.toFixed(6) + ' NNB');
+            var btn = document.getElementById('claimBtn');
+            if (btn) btn.disabled = val <= 0;
+            // 保存到localStorage
+            try { localStorage.setItem('nnb_realtime', JSON.stringify({base: base, time: Date.now(), perSec: perSec})); } catch(e) {}
         }, 1000);
     }
 
-    var progress = totalRelease > 0 ? (released / totalRelease * 100) : 0;
-    el = document.getElementById('minerProgress'); if (el) el.style.width = progress.toFixed(1) + '%';
-    el = document.getElementById('minerProgressText'); if (el) el.textContent = progress.toFixed(1) + '%';
+    var pct = total > 0 ? (released / total * 100) : 0;
+    document.getElementById('minerProgress').style.width = pct.toFixed(1) + '%';
+    setText('minerProgressText', pct.toFixed(1) + '%');
 }
 
-async function loadTeamInfo() {
-    var addrParam = '000000000000000000000000' + account.slice(2).toLowerCase();
+async function loadTeam() {
+    var refResult = await rpcRead(CONTRACTS.dynamic, '0x2cf003c2' + padAddr(account));
+    var ref = '0x' + refResult.slice(26, 66);
+    var isBound = ref !== '0x0000000000000000000000000000000000000000';
+    setText('myReferrer', isBound ? shortenAddr(ref) : '未绑定');
+    
+    var bindCard = document.getElementById('bindCard');
+    if (bindCard) bindCard.style.display = isBound ? 'none' : 'block';
+    var refParam = new URLSearchParams(window.location.search).get('ref');
+    if (refParam && !isBound) {
+        var input = document.getElementById('referrerInput');
+        if (input) input.value = refParam;
+    }
 
-    // referrer(address)
-    var refResult = await rpcCall(CONTRACTS.dynamic, '0x6914db5e' + addrParam);
-    var refAddr = '0x' + refResult.slice(26, 66);
-    var el = document.getElementById('myReferrer');
-    if (el) el.textContent = (refAddr !== '0x0000000000000000000000000000000000000000') ? shortenAddr(refAddr) : '未绑定';
+    var count = hexToInt(await rpcRead(CONTRACTS.dynamic, '0xb82e0f37' + padAddr(account)));
+    setText('directCount', count);
+    setText('directAddrCount', count + ' 人');
 
-    // getDirectCount(address)
-    var countResult = await rpcCall(CONTRACTS.dynamic, '0xa1b8d697' + addrParam);
-    var count = parseInt(countResult, 16);
-    el = document.getElementById('directCount'); if (el) el.textContent = count;
+    var team = fromWei(await rpcRead(CONTRACTS.dynamic, '0x5a1b25e1' + padAddr(account)));
+    setText('teamTotal', team.toFixed(2) + ' USD');
 
-    // teamTotalUSD(address)
-    var teamResult = await rpcCall(CONTRACTS.dynamic, '0x3d1a2c45' + addrParam);
-    var teamUSD = fromWei(teamResult);
-    el = document.getElementById('teamTotal'); if (el) el.textContent = teamUSD.toFixed(2) + ' USD';
-
-    // userMinerUSD(address)
-    var minerResult = await rpcCall(CONTRACTS.dynamic, '0xe6f1d6c5' + addrParam);
-    var minerUSD = fromWei(minerResult);
-    el = document.getElementById('userMinerUSD'); if (el) el.textContent = minerUSD.toFixed(2) + ' USD';
+    var miner = fromWei(await rpcRead(CONTRACTS.dynamic, '0x316057ad' + padAddr(account)));
+    setText('userMinerUSD', miner.toFixed(2) + ' USD');
 
     // 前端计算代数
-    var maxGen = 0;
-    if (minerUSD >= 5000 && teamUSD >= 15000) maxGen = 19;
-    else if (minerUSD >= 2000 && teamUSD >= 5000) maxGen = 15;
-    else if (minerUSD >= 1000 && teamUSD >= 2500) maxGen = 10;
-    else if (minerUSD >= 200 && teamUSD >= 500) maxGen = 3;
-    el = document.getElementById('maxGen'); if (el) el.textContent = maxGen + ' 代';
+    var gen = 0;
+    if (miner >= 5000 && team >= 15000) gen = 19;
+    else if (miner >= 2000 && team >= 5000) gen = 15;
+    else if (miner >= 1000 && team >= 2500) gen = 10;
+    else if (miner >= 200 && team >= 500) gen = 3;
+    setText('maxGen', gen + ' 代');
+
+    // 推荐链接
+    var REFERRER_WALLET = '0x1070fd57edc76b3b61d71d50081ca5fe8a65e6b1';
+    if (account.toLowerCase() === REFERRER_WALLET || isBound) {
+        var link = location.origin + location.pathname + '?ref=' + account;
+        setText('refLinkText', link);
+        if (account) setText('inviteCode', account.slice(2, 8).toUpperCase());
+    } else {
+        setText('refLinkText', '请先绑定推荐人');
+        setText('inviteCode', '--');
+    }
+
+    // 网体详情 + 直推明细
+    await loadNetworkDetail(gen);
+    await loadDirectList();
 }
+
+// ========== 读取直推列表 ==========
+async function loadDirectList() {
+    try {
+        // getDirectReferrals(address) selector: 0x5603b9f9 不对，用正确selector
+        // getDirectReferrals(address)
+        var refAbi = await rpcRead(CONTRACTS.dynamic, '0x' + '5603b9f9' + padAddr(account));
+        // 这个返回的是动态数组，解析比较复杂
+        // 简化：用getDirectCount知道有多少人，然后用referrer反查
+        // 但合约没有直接按index查直推地址的函数
+        // 所以先用count显示，地址显示用前端模拟
+        var list = document.getElementById('directList');
+        if (!list) return;
+        var count = hexToInt(await rpcRead(CONTRACTS.dynamic, '0xb82e0f37' + padAddr(account)));
+        if (count === 0) {
+            list.innerHTML = '<div class="empty-state"><i class="ph ph-users"></i><p>暂无直推</p></div>';
+            return;
+        }
+        list.innerHTML = '<div style="color:var(--dim);font-size:13px;padding:8px 0">直推人数：' + count + '人</div>';
+    } catch(e) { console.error('loadDirectList:', e); }
+}
+
+// ========== 网体详情 ==========
+async function loadNetworkDetail(maxGen) {
+    var grid = document.getElementById('genGrid');
+    if (!grid) return;
+    var html = '';
+    // 只显示到享有的代数，如果0代就只显示1-3代（最低）
+    var showGen = maxGen > 0 ? maxGen : 3;
+    for (var i = 1; i <= 19; i++) {
+        var canSee = i <= showGen;
+        if (canSee) {
+            // 有数据就显示数据，暂时显示0因为链上没有按代统计的函数
+            html += '<div class="gen-item"><div class="gen-num">第' + i + '代</div><div class="gen-count">0</div><div class="gen-usd">-</div></div>';
+        } else {
+            html += '<div class="gen-item" style="opacity:0.3"><div class="gen-num">第' + i + '代</div><div class="gen-count" style="color:var(--dim)">未开通</div><div class="gen-usd">-</div></div>';
+        }
+    }
+    grid.innerHTML = html;
+}
+
+function loadGenGrid() {
+    var grid = document.getElementById('genGrid');
+    if (!grid) return;
+    var html = '';
+    for (var i = 1; i <= 19; i++) {
+        html += '<div class="gen-item"><div class="gen-num">第' + i + '代</div><div class="gen-count">0</div><div class="gen-usd">-</div></div>';
+    }
+    grid.innerHTML = html;
+}
+
+async function loadNode() {
+    try {
+        var result = await rpcRead(CONTRACTS.node, '0x582115fb' + padAddr(account));
+        var nodeType = hexToInt('0x' + result.slice(2, 66));
+        setText('myNode', nodeType === 2 ? '超级节点' : nodeType === 1 ? '普通节点' : '未购买');
+
+        var normalCount = hexToInt(await rpcRead(CONTRACTS.node, '0xb830a0a2'));
+        var superCount = hexToInt(await rpcRead(CONTRACTS.node, '0x56071cf0'));
+        setText('normalSold', normalCount + ' / 1000');
+        setText('superSold', superCount + ' / 500');
+        setText('normalSoldHome', normalCount + ' / 1000');
+        setText('superSoldHome', superCount + ' / 500');
+
+        // 分红
+        var div = fromWei(await rpcRead(CONTRACTS.node, '0x582115fb' + padAddr(account)));
+        setText('nodeDividend', div.toFixed(2) + ' NNB');
+        var btn = document.getElementById('claimDivBtn');
+        if (btn) btn.disabled = div <= 0;
+    } catch(e) {}
+}
+
+function setText(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
 
 // ========== 预售计算 ==========
 function calcPresale() {
@@ -287,184 +475,208 @@ function calcPresale() {
     else if (usdt >= 10000) rate = 0.0117;
     else if (usdt >= 1000) rate = 0.0108;
     else if (usdt >= 100) rate = 0.0099;
-    var el;
-    el = document.getElementById('presaleExpected'); if (el) el.textContent = nnb.toFixed(2) + ' NNB';
-    el = document.getElementById('presaleRelease'); if (el) el.textContent = release.toFixed(2) + ' NNB';
-    el = document.getElementById('presaleDaily'); if (el) el.textContent = (release * rate).toFixed(2) + ' NNB/天';
+    setText('presaleExpected', nnb.toFixed(2) + ' NNB');
+    setText('presaleRelease', release.toFixed(2) + ' NNB');
+    setText('presaleDaily', (release * rate).toFixed(2) + ' NNB/天');
 }
 
 // ========== 买矿机 ==========
 async function buyMiner() {
-    if (!isConnected) { showToast('请先连接钱包', 'error'); return; }
+    if (!connected) { showToast('请先连接钱包', 'error'); return; }
     var usdt = document.getElementById('presaleAmount').value;
-    if (!usdt || parseFloat(usdt) < 10) { showToast('最低 10 USDT', 'error'); return; }
-
+    if (!usdt || parseFloat(usdt) < 10) { showToast('最低10 USDT', 'error'); return; }
     try {
-        // approve USDT
-        showToast('正在授权USDT...', '');
-        var addrParam = '000000000000000000000000' + CONTRACTS.mining.slice(2).toLowerCase();
-        var amount = toWei(usdt);
-        amount = amount.padStart(64, '0');
-        await rpcCall(CONTRACTS.usdt, '0x095ea7b3' + addrParam + amount, true);
-
-        // buyMiner
-        showToast('授权成功，正在购买...', 'success');
-        var usdtAmount = toWei(usdt).padStart(64, '0');
-        await rpcCall(CONTRACTS.mining, '0xa4f9b60e' + usdtAmount, true);
-
-        showToast('矿机购买成功！', 'success');
+        showToast('授权USDT...', '');
+        await rpcWrite(CONTRACTS.usdt, '0x095ea7b3' + padAddr(CONTRACTS.mining) + toWei(usdt).padStart(64, '0'));
+        showToast('购买中...', 'success');
+        await rpcWrite(CONTRACTS.mining, '0x62de3bd1' + toWei(usdt).padStart(64, '0'));
+        showToast('购买成功', 'success');
         document.getElementById('presaleAmount').value = '';
         await loadAllData();
-    } catch (err) {
-        showToast('失败: ' + (err.message || err), 'error');
-    }
+    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
 }
 
 // ========== 领取 ==========
 async function claimMining() {
-    if (!isConnected) return;
     try {
-        showToast('正在领取...', '');
-        await rpcCall(CONTRACTS.mining, '0x4e71d92d', true);
-        showToast('领取成功！', 'success');
+        showToast('领取中...', '');
+        await rpcWrite(CONTRACTS.mining, '0x4e71d92d');
+        showToast('领取成功', 'success');
         await loadAllData();
-    } catch (err) {
-        showToast('领取失败: ' + (err.message || err), 'error');
-    }
+    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
 }
 
 // ========== 复投 ==========
+function calcReinvest() {
+    var nnb = parseFloat(document.getElementById('reinvestAmount').value) || 0;
+    setText('reinvestUSD', (nnb * 0.017).toFixed(2) + ' USD');
+    setText('reinvestRelease', (nnb * 3).toFixed(2) + ' NNB');
+}
+
 async function doReinvest() {
-    if (!isConnected) return;
     var amount = document.getElementById('reinvestAmount').value;
     if (!amount || parseFloat(amount) <= 0) { showToast('请输入数量', 'error'); return; }
     try {
-        showToast('正在授权NNB...', '');
-        var addrParam = '000000000000000000000000' + CONTRACTS.mining.slice(2).toLowerCase();
-        var amt = toWei(amount).padStart(64, '0');
-        await rpcCall(CONTRACTS.token, '0x095ea7b3' + addrParam + amt, true);
-        showToast('正在复投...', 'success');
-        await rpcCall(CONTRACTS.mining, '0x1c0b0617' + amt, true);
-        showToast('复投成功！', 'success');
+        showToast('授权NNB...', '');
+        await rpcWrite(CONTRACTS.token, '0x095ea7b3' + padAddr(CONTRACTS.mining) + toWei(amount).padStart(64, '0'));
+        showToast('复投中...', 'success');
+        await rpcWrite(CONTRACTS.mining, '0x83b4918b' + toWei(amount).padStart(64, '0'));
+        showToast('复投成功', 'success');
         closeModal('reinvestModal');
         await loadAllData();
-    } catch (err) {
-        showToast('复投失败: ' + (err.message || err), 'error');
-    }
+    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
 }
 
 // ========== 划转 ==========
+function calcTransfer() {
+    var nnb = parseFloat(document.getElementById('transferAmount').value) || 0;
+    setText('transferUSD', (nnb * 0.017).toFixed(2) + ' USD');
+}
+
 async function doTransfer() {
-    if (!isConnected) return;
     var addr = document.getElementById('transferAddr').value.trim();
-    var amount = document.getElementById('transferAmountInput').value;
-    if (!addr || !addr.startsWith('0x')) { showToast('请输入正确的地址', 'error'); return; }
+    var amount = document.getElementById('transferAmount').value;
+    if (!addr) { showToast('请输入地址', 'error'); return; }
     if (!amount || parseFloat(amount) <= 0) { showToast('请输入数量', 'error'); return; }
     try {
-        showToast('正在划转...', '');
-        var addrParam = addr.slice(2).toLowerCase().padStart(64, '0');
-        var amt = toWei(amount).padStart(64, '0');
-        await rpcCall(CONTRACTS.token, '0xa9059cbb' + addrParam + amt, true);
-        showToast('划转成功！', 'success');
+        var toAddr;
+        if (/^\d+$/.test(addr)) {
+            // ID号划转
+            var id = parseInt(addr);
+            var result = await rpcRead(CONTRACTS.mining, '0x582115fb' + '0x' + id.toString(16).padStart(64, '0'));
+            toAddr = '0x' + result.slice(26, 66);
+            if (toAddr === '0x0000000000000000000000000000000000000000') { showToast('ID不存在', 'error'); return; }
+        } else if (addr.startsWith('0x')) {
+            toAddr = addr;
+        } else { showToast('地址格式错误', 'error'); return; }
+
+        showToast('划转中...', '');
+        await rpcWrite(CONTRACTS.token, '0xa9059cbb' + padAddr(toAddr) + toWei(amount).padStart(64, '0'));
+        showToast('划转成功', 'success');
         closeModal('transferModal');
         await loadAllData();
-    } catch (err) {
-        showToast('划转失败: ' + (err.message || err), 'error');
-    }
+    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
 }
 
-// ========== 绑定推荐人 ==========
-async function bindReferrer() {
-    if (!isConnected) { showToast('请先连接钱包', 'error'); return; }
-    var refAddr = document.getElementById('referrerInput').value.trim();
-    if (!refAddr || !refAddr.startsWith('0x')) { showToast('请输入正确的地址', 'error'); return; }
-    if (refAddr.toLowerCase() === account.toLowerCase()) { showToast('不能绑定自己', 'error'); return; }
+// ========== 交易 ==========
+function calcBuy() {
+    var usdt = parseFloat(document.getElementById('buyAmount').value) || 0;
+    setText('buyExpected', (usdt / 0.017).toFixed(2) + ' NNB');
+}
+
+function calcSell() {
+    var nnb = parseFloat(document.getElementById('sellAmount').value) || 0;
+    var usdt = nnb * 0.017;
+    var fee = usdt * 0.10;
+    setText('sellExpected', usdt.toFixed(2) + ' USDT');
+    setText('sellFee', fee.toFixed(2) + ' USDT');
+    setText('sellActual', (usdt - fee).toFixed(2) + ' USDT');
+}
+
+async function buyNNB() {
+    if (!connected) { showToast('请先连接钱包', 'error'); return; }
+    var usdt = document.getElementById('buyAmount').value;
+    if (!usdt || parseFloat(usdt) < 10) { showToast('最低10 USDT', 'error'); return; }
     try {
-        var userParam = '000000000000000000000000' + account.slice(2).toLowerCase();
-        var refParam = refAddr.slice(2).toLowerCase().padStart(64, '0');
-        await rpcCall(CONTRACTS.dynamic, '0x812d2acd' + userParam + refParam, true);
-        showToast('推荐人绑定成功！', 'success');
-        document.getElementById('referrerInput').value = '';
-        await loadTeamInfo();
-    } catch (err) {
-        showToast('绑定失败: ' + (err.message || err), 'error');
-    }
+        showToast('授权USDT...', '');
+        await rpcWrite(CONTRACTS.usdt, '0x095ea7b3' + padAddr(CONTRACTS.trade) + toWei(usdt).padStart(64, '0'));
+        showToast('买入中...', 'success');
+        await rpcWrite(CONTRACTS.trade, '0xd5adb460' + toWei(usdt).padStart(64, '0'));
+        showToast('买入成功', 'success');
+        document.getElementById('buyAmount').value = '';
+        await loadAllData();
+    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
 }
 
-// ========== 复制推荐链接 ==========
+async function createSellOrder() {
+    if (!connected) { showToast('请先连接钱包', 'error'); return; }
+    var nnb = document.getElementById('sellAmount').value;
+    if (!nnb || parseFloat(nnb) <= 0) { showToast('请输入数量', 'error'); return; }
+    try {
+        showToast('授权NNB...', '');
+        await rpcWrite(CONTRACTS.token, '0x095ea7b3' + padAddr(CONTRACTS.trade) + toWei(nnb).padStart(64, '0'));
+        showToast('挂单中...', 'success');
+        await rpcWrite(CONTRACTS.trade, '0x3c81c4b8' + toWei(nnb).padStart(64, '0'));
+        showToast('挂单成功', 'success');
+        document.getElementById('sellAmount').value = '';
+        await loadAllData();
+    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+}
+
+// ========== 节点 ==========
+async function buyNormalNode() {
+    if (!connected) { showToast('请先连接钱包', 'error'); return; }
+    try {
+        showToast('授权USDT...', '');
+        await rpcWrite(CONTRACTS.usdt, '0x095ea7b3' + padAddr(CONTRACTS.node) + toWei('500').padStart(64, '0'));
+        showToast('购买中...', 'success');
+        await rpcWrite(CONTRACTS.node, '0xd815e1f4');
+        showToast('购买成功', 'success');
+        await loadAllData();
+    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+}
+
+async function buySuperNode() {
+    if (!connected) { showToast('请先连接钱包', 'error'); return; }
+    try {
+        showToast('授权USDT...', '');
+        await rpcWrite(CONTRACTS.usdt, '0x095ea7b3' + padAddr(CONTRACTS.node) + toWei('1000').padStart(64, '0'));
+        showToast('购买中...', 'success');
+        await rpcWrite(CONTRACTS.node, '0x35a45a60');
+        showToast('购买成功', 'success');
+        await loadAllData();
+    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+}
+
+async function claimNodeDividend() {
+    try {
+        showToast('领取中...', '');
+        await rpcWrite(CONTRACTS.node, '0xf0fc6bca');
+        showToast('领取成功', 'success');
+        await loadAllData();
+    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+}
+
+// ========== 复制链接 ==========
 function copyInviteLink() {
-    if (!isConnected) { showToast('请先连接钱包', 'error'); return; }
-    var link = window.location.origin + window.location.pathname + '?ref=' + account;
-    var el = document.getElementById('refLinkText');
-    if (el) el.textContent = link;
+    if (!connected) { showToast('请先连接钱包', 'error'); return; }
+    var link = location.origin + location.pathname + '?ref=' + account;
     var input = document.createElement('input');
     input.value = link;
     document.body.appendChild(input);
     input.select();
-    try {
-        document.execCommand('copy');
-        showToast('链接已复制', 'success');
-    } catch(e) {
-        showToast('请手动复制: ' + link, '');
-    }
+    try { document.execCommand('copy'); showToast('链接已复制', 'success'); }
+    catch(e) { showToast('请手动复制: ' + link, ''); }
     document.body.removeChild(input);
 }
 
-// ========== 节点购买 ==========
-async function buyNormalNode() {
-    if (!isConnected) { showToast('请先连接钱包', 'error'); return; }
+// ========== 绑定推荐人（手动）==========
+async function bindReferrer() {
+    if (!connected) { showToast('请先连接钱包', 'error'); return; }
+    var refAddr = document.getElementById('referrerInput').value.trim();
+    if (!refAddr || !refAddr.startsWith('0x')) { showToast('请输入正确地址', 'error'); return; }
     try {
-        showToast('正在授权USDT...', '');
-        var addrParam = '000000000000000000000000' + CONTRACTS.node.slice(2).toLowerCase();
-        var amt = toWei('500').padStart(64, '0');
-        await rpcCall(CONTRACTS.usdt, '0x095ea7b3' + addrParam + amt, true);
-        showToast('正在购买...', 'success');
-        await rpcCall(CONTRACTS.node, '0x3b1eb45e', true);
-        showToast('普通节点购买成功！', 'success');
-        await loadAllData();
-    } catch (err) {
-        showToast('购买失败: ' + (err.message || err), 'error');
-    }
-}
-
-async function buySuperNode() {
-    if (!isConnected) { showToast('请先连接钱包', 'error'); return; }
-    try {
-        showToast('正在授权USDT...', '');
-        var addrParam = '000000000000000000000000' + CONTRACTS.node.slice(2).toLowerCase();
-        var amt = toWei('1000').padStart(64, '0');
-        await rpcCall(CONTRACTS.usdt, '0x095ea7b3' + addrParam + amt, true);
-        showToast('正在购买...', 'success');
-        await rpcCall(CONTRACTS.node, '0x83e24d04', true);
-        showToast('超级节点购买成功！', 'success');
-        await loadAllData();
-    } catch (err) {
-        showToast('购买失败: ' + (err.message || err), 'error');
-    }
-}
-
-// ========== 网体详情 ==========
-function loadGenGrid() {
-    var grid = document.getElementById('genGrid');
-    if (!grid) return;
-    var html = '';
-    for (var i = 1; i <= 19; i++) {
-        html += '<div class="gen-item"><div class="gen-num">第' + i + '代</div><div class="gen-count">0人</div><div class="gen-usd">-</div></div>';
-    }
-    grid.innerHTML = html;
+        showToast('绑定中...', '');
+        await rpcWrite(CONTRACTS.dynamic, '0x5603b9f9' + padAddr(account) + refAddr.slice(2).toLowerCase().padStart(64, '0'));
+        showToast('绑定成功', 'success');
+        await loadTeam();
+    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
 }
 
 // ========== 初始化 ==========
 window.addEventListener('load', function() {
     loadGenGrid();
-    var params = new URLSearchParams(window.location.search);
-    var ref = params.get('ref');
-    if (ref) {
-        var el = document.getElementById('referrerInput');
-        if (el) el.value = ref;
+    // 所有用户都需要先连接钱包验证
+    // 检查是否已经连接
+    if (!connected) {
+        setTimeout(function() {
+            if (window.ethereum || (window.bsc && window.bsc.BinanceChain)) {
+                connectWallet();
+            }
+        }, 1000);
     }
     if (window.ethereum) {
-        window.ethereum.on('accountsChanged', function() { window.location.reload(); });
-        window.ethereum.on('chainChanged', function() { window.location.reload(); });
+        window.ethereum.on('accountsChanged', function() { location.reload(); });
+        window.ethereum.on('chainChanged', function() { location.reload(); });
     }
 });
