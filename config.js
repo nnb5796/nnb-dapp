@@ -5,9 +5,9 @@ const BAFU_CONFIG = {
     rpcUrl: 'https://bsc-dataseed.binance.org/',
     explorerUrl: 'https://bscscan.com',
 
-    tokenContract: '0x0EA63C194D1Bd0887637C236069D44129442E0Ef',
-    miningContract: '0x179E2BD8AcC6c4F4d1629b48AEA01601612Ce031',
-    dynamicContract: '0xD7f20901E2623E711B8B1eBC73A70Ed041A6037A',
+    tokenContract: '0x66845B432fCcFf670849Bbaf79618cb5C22903B0',
+    miningContract: '0x248c0DFc4Feb88F6F7b2bd36d97406f65B4Ad952',
+    dynamicContract: '0x19C38eD9A442e188B036dF58C7638920C8EeDdC5',
     nodeContract: '0x5D3fB89AE094BdfcB5df2b67BdE49264c29f490b',
     tradeContract: '0x3f7b92cd9340D37cC891D0352Ff1196168f4DBcb',
 

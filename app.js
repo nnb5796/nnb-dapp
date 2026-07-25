@@ -6,11 +6,11 @@ let isConnected = false;
 
 // 合约地址
 const CONTRACTS = {
-    token: '0x66845B432fCcFf670849Bbaf79618cb5C22903B0',
-    mining: '0x248c0DFc4Feb88F6F7b2bd36d97406f65B4Ad952',
-    dynamic: '0x19C38eD9A442e188B036dF58C7638920C8EeDdC5',
-    node: '0x5D3fB89AE094BdfcB5df2b67BdE49264c29f490b',
-    trade: '0x3f7b92cd9340D37cC891D0352Ff1196168f4DBcb',
+    token: '0x02506bb817808C84960Dae891C6626afbecC4Ce8',
+    mining: '0x5D89781b521f7e06A54D5A9793058b36217300e1',
+    dynamic: '0xF0Dfd18ADAee644cbe440DA1AdEd930c71097886',
+    node: '0x099ce609a02d4a848F5553d8E5AC32Fc72E4Ef8a',
+    trade: '0x580CF0bea642350358cB26Bd21EE0D7e420D82c5',
     usdt: '0x55d398326f99059fF775485246999027B3197955',
 };
 
@@ -48,12 +48,19 @@ function toWei(amount) {
 }
 
 function fromWei(weiStr) {
+    // 兼容hex和十进制
+    if (typeof weiStr === 'string' && weiStr.startsWith('0x')) {
+        weiStr = BigInt(weiStr).toString();
+    }
     var wei = BigInt(weiStr);
     var whole = wei / BigInt('1000000000000000000');
     var frac = wei % BigInt('1000000000000000000');
     var fracStr = frac.toString().padStart(18, '0');
     fracStr = fracStr.replace(/0+$/, '').slice(0, 6);
-    return parseFloat(whole.toString() + '.' + fracStr);
+    if (fracStr) {
+        return parseFloat(whole.toString() + '.' + fracStr);
+    }
+    return parseFloat(whole.toString());
 }
 
 // ========== 页面切换 ==========
@@ -154,8 +161,10 @@ async function loadPriceAndSupply() {
 
     var soldResult = await rpcCall(CONTRACTS.mining, '0xe5e16551'); // totalSold()
     var sold = fromWei(soldResult);
-    el = document.getElementById('soldProgress'); if (el) el.textContent = sold.toFixed(0) + ' / 21,000,000';
-    el = document.getElementById('presaleRemaining'); if (el) el.textContent = (21000000 - sold).toFixed(0) + ' NNB';
+    var maxResult = await rpcCall(CONTRACTS.mining, '0xd5b13967'); // maxSupply()
+    var maxNum = fromWei(maxResult);
+    el = document.getElementById('soldProgress'); if (el) el.textContent = sold.toFixed(0) + ' / ' + maxNum.toFixed(0);
+    el = document.getElementById('presaleRemaining'); if (el) el.textContent = (maxNum - sold).toFixed(0) + ' NNB';
 }
 
 async function loadWalletBalance() {
