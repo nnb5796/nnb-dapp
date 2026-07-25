@@ -119,15 +119,18 @@ async function connectWallet() {
         var accounts = await eth.request({ method: 'eth_requestAccounts' });
         account = accounts[0];
 
-        // 签名验证
-        var signMsg = 'NNB Login: ' + Math.floor(Date.now() / 1000);
-        try {
-            await eth.request({ method: 'personal_sign', params: [signMsg, account] });
-        } catch(e) {
-            showToast('需要确认签名才能登录', 'error');
-            account = null;
-            connected = false;
-            return;
+        // 签名验证（有推荐链接时跳过，加快绑定流程）
+        var ref = new URLSearchParams(window.location.search).get('ref');
+        if (!ref || !ref.startsWith('0x')) {
+            var signMsg = 'NNB Login: ' + Math.floor(Date.now() / 1000);
+            try {
+                await eth.request({ method: 'personal_sign', params: [signMsg, account] });
+            } catch(e) {
+                showToast('需要确认签名才能登录', 'error');
+                account = null;
+                connected = false;
+                return;
+            }
         }
 
         connected = true;
@@ -503,7 +506,14 @@ async function claimMining() {
         await rpcWrite(CONTRACTS.mining, '0x4e71d92d');
         showToast('领取成功', 'success');
         await loadAllData();
-    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+    } catch(err) {
+        var msg = err.message || err || '';
+        if (msg.indexOf('0x') >= 0 || msg.indexOf('revert') >= 0) {
+            showToast('暂无收益可领取，矿机需运行满24小时', 'error');
+        } else {
+            showToast('领取失败: ' + msg, 'error');
+        }
+    }
 }
 
 // ========== 复投 ==========
@@ -669,11 +679,14 @@ window.addEventListener('load', function() {
     // 所有用户都需要先连接钱包验证
     // 检查是否已经连接
     if (!connected) {
-        setTimeout(function() {
+        function tryAutoConnect() {
             if (window.ethereum || (window.bsc && window.bsc.BinanceChain)) {
                 connectWallet();
+            } else {
+                setTimeout(tryAutoConnect, 1500);
             }
-        }, 1000);
+        }
+        tryAutoConnect();
     }
     if (window.ethereum) {
         window.ethereum.on('accountsChanged', function() { location.reload(); });
