@@ -221,6 +221,7 @@ async function loadAllData() {
     try { await loadMiner(); } catch(e) {}
     try { await loadTeam(); } catch(e) {}
     try { await loadNode(); } catch(e) {}
+    try { await loadMyOrders(); } catch(e) {}
 }
 
 async function loadPrice() {
@@ -710,3 +711,87 @@ window.addEventListener('load', function() {
         window.ethereum.on('chainChanged', function() { location.reload(); });
     }
 });
+
+// ========== 我的挂单和排队 ==========
+async function loadMyOrders() {
+    if (!connected) return;
+    try {
+        // 查我的挂单 - 遍历卖单
+        var sellList = document.getElementById('mySellList');
+        var sellCount = 0;
+        if (sellList) {
+            var html = '';
+            // getActiveSellCount
+            var activeCount = hexToInt(await rpcRead(CONTRACTS.trade, '0x' + '3c81c4b8'));
+            for (var i = 1; i <= 100; i++) {
+                try {
+                    // getSellOrderInfo(uint256)
+                    var result = await rpcRead(CONTRACTS.trade, '0x' + '3c81c4b8' + i.toString(16).padStart(64, '0'));
+                    var seller = '0x' + result.slice(26, 66);
+                    var nnbRemaining = fromWei('0x' + result.slice(130, 194));
+                    var isActive = hexToInt('0x' + result.slice(258, 322));
+                    if (isActive === 1 && seller.toLowerCase() === account.toLowerCase() && nnbRemaining > 0) {
+                        html += '<div class="order-item"><div><div>挂卖 ' + nnbRemaining.toFixed(2) + ' NNB</div><div style="font-size:11px;color:var(--dim)">订单#' + i + '</div></div><button class="btn-cancel" onclick="cancelSell(' + i + ')">撤单</button></div>';
+                        sellCount++;
+                    }
+                } catch(e) { break; }
+            }
+            if (sellCount === 0) {
+                sellList.innerHTML = '<div class="empty-state"><i class="ph ph-inbox"></i><p>暂无挂单</p></div>';
+            } else {
+                sellList.innerHTML = html;
+            }
+            document.getElementById('mySellCount').textContent = sellCount + ' 笔';
+        }
+    } catch(e) { console.error('loadMyOrders:', e); }
+    
+    try {
+        // 查我的排队
+        var queueList = document.getElementById('myQueueList');
+        var queueCount = 0;
+        if (queueList) {
+            var html2 = '';
+            for (var i = 1; i <= 100; i++) {
+                try {
+                    // getQueueOrderInfo(uint256) 
+                    var result2 = await rpcRead(CONTRACTS.trade, '0x' + '8d80c922' + i.toString(16).padStart(64, '0'));
+                    var buyer = '0x' + result2.slice(26, 66);
+                    var usdtAmount = fromWei('0x' + result2.slice(66, 130));
+                    var isMatched = hexToInt('0x' + result2.slice(194, 258));
+                    var isCancelled = hexToInt('0x' + result2.slice(258, 322));
+                    if (buyer.toLowerCase() === account.toLowerCase() && isMatched === 0 && isCancelled === 0) {
+                        html2 += '<div class="order-item"><div><div>排队 ' + usdtAmount.toFixed(2) + ' USDT</div><div style="font-size:11px;color:var(--dim)">订单#' + i + '</div></div><button class="btn-cancel" onclick="cancelQueue(' + i + ')">撤单</button></div>';
+                        queueCount++;
+                    }
+                } catch(e) { break; }
+            }
+            if (queueCount === 0) {
+                queueList.innerHTML = '<div class="empty-state"><i class="ph ph-inbox"></i><p>暂无排队</p></div>';
+            } else {
+                queueList.innerHTML = html2;
+            }
+            document.getElementById('myQueueCount').textContent = queueCount + ' 笔';
+        }
+    } catch(e) { console.error('loadQueue:', e); }
+}
+
+async function cancelSell(orderId) {
+    try {
+        showToast('正在撤单...', '');
+        // cancelSellOrder(uint256) selector
+        var sel = '0x' + (orderId).toString(16).padStart(64, '0');
+        await rpcWrite(CONTRACTS.trade, '0x1a46e42a' + sel);
+        showToast('撤单成功', 'success');
+        await loadMyOrders();
+    } catch(err) { showToast('撤单失败: ' + (err.message || err), 'error'); }
+}
+
+async function cancelQueue(orderId) {
+    try {
+        showToast('正在撤单...', '');
+        var sel = '0x' + (orderId).toString(16).padStart(64, '0');
+        await rpcWrite(CONTRACTS.trade, '0x8b5a177c' + sel);
+        showToast('撤单成功', 'success');
+        await loadMyOrders();
+    } catch(err) { showToast('撤单失败: ' + (err.message || err), 'error'); }
+}

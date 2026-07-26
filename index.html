@@ -118,7 +118,15 @@
                 <button class="btn-primary btn-block" onclick="createSellOrder()"><i class="ph-fill ph-paper-plane"></i> 挂单卖出</button>
             </div>
             <div class="info-card">
-                <div class="card-header"><span>挂单列表</span><span id="sellOrderCount">0 笔</span></div>
+                <div class="card-header"><span>我的挂单</span><span id="mySellCount">0 笔</span></div>
+                <div id="mySellList"><div class="empty-state"><i class="ph ph-inbox"></i><p>暂无挂单</p></div></div>
+            </div>
+            <div class="info-card">
+                <div class="card-header"><span>我的排队</span><span id="myQueueCount">0 笔</span></div>
+                <div id="myQueueList"><div class="empty-state"><i class="ph ph-inbox"></i><p>暂无排队</p></div></div>
+            </div>
+            <div class="info-card">
+                <div class="card-header"><span>全部挂单</span><span id="sellOrderCount">0 笔</span></div>
                 <div id="sellOrderList"><div class="empty-state"><i class="ph ph-inbox"></i><p>暂无挂单</p></div></div>
             </div>
         </div>
@@ -253,6 +261,6 @@
     </nav>
 
     <div id="toast" class="toast"></div>
-    <script src="app.js?v=19"></script>
+    <script src="app.js?v=20"></script>
 </body>
 </html>

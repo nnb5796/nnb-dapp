@@ -134,3 +134,18 @@ input[type="text"]:focus { border-color:var(--primary); }
 .toast.show { display:block; }
 .toast.success { border-color:var(--success); }
 .toast.error { border-color:var(--danger); }
+
+/* 撤单按钮 */
+.btn-cancel {
+    padding: 6px 16px; border-radius: 8px; border: 1px solid var(--danger);
+    background: rgba(239,68,68,0.1); color: var(--danger); font-size: 13px; font-weight: 600;
+    cursor: pointer;
+}
+.btn-cancel:hover { background: var(--danger); color: #fff; }
+
+/* 订单项 */
+.order-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.order-item:last-child { border-bottom: none; }
