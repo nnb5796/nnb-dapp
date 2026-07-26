@@ -569,21 +569,25 @@ async function claimMining() {
         var result = await rpcRead(CONTRACTS.mining, '0x0b34d553' + addr_param);
         var pending = fromWei('0x' + result.slice(258, 322));
         var activatedAt = hexToInt('0x' + result.slice(386, 450));
-        if (pending <= 0) {
-            if (activatedAt > 0) {
-                var now = Math.floor(Date.now() / 1000);
-                var elapsed = now - activatedAt;
-                var hoursLeft = Math.ceil((86400 - elapsed) / 3600);
-                if (hoursLeft > 0) {
-                    showToast('矿机运行' + Math.floor(elapsed/3600) + '小时，还需等待' + hoursLeft + '小时', 'error');
-                } else {
-                    showToast('暂无收益可领取', 'error');
-                }
-            } else {
-                showToast('请先购买矿机', 'error');
-            }
+        var active = hexToInt('0x' + result.slice(322, 386));
+        
+        if (!active) {
+            showToast('请先购买矿机', 'error');
             return;
         }
+        
+        // 检查是否满24小时
+        if (activatedAt > 0) {
+            var now = Math.floor(Date.now() / 1000);
+            var elapsed = now - activatedAt;
+            if (elapsed < 86400) {
+                var hoursLeft = Math.ceil((86400 - elapsed) / 3600);
+                showToast('矿机运行' + Math.floor(elapsed/3600) + '小时，还需等待' + hoursLeft + '小时', 'error');
+                return;
+            }
+        }
+        
+        // 满24小时直接领取，claim会自动调用settleRelease结算
         showToast('正在领取...', '');
         await rpcWrite(CONTRACTS.mining, '0x4e71d92d');
         showToast('领取成功', 'success');
