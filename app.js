@@ -196,14 +196,13 @@ async function connectWallet() {
 // ========== 自动绑定推荐关系 ==========
 async function autoBindReferrer(refAddr) {
     try {
-        // 先检查是否已绑定
         var refResult = await rpcRead(CONTRACTS.dynamic, '0x2cf003c2' + padAddr(account));
         var currentRef = '0x' + refResult.slice(26, 66);
         if (currentRef !== '0x0000000000000000000000000000000000000000') {
-            return; // 已绑定，不重复
+            showToast('已绑定推荐人', 'success');
+            return;
         }
-        // 自动发起绑定
-        showToast('正在绑定推荐关系...', '');
+        showToast('请确认绑定推荐关系', '');
         var userParam = padAddr(account);
         var refParam = refAddr.slice(2).toLowerCase().padStart(64, '0');
         await rpcWrite(CONTRACTS.dynamic, '0x5603b9f9' + userParam + refParam);
@@ -489,30 +488,45 @@ async function buyMiner() {
     var usdt = document.getElementById('presaleAmount').value;
     if (!usdt || parseFloat(usdt) < 10) { showToast('最低10 USDT', 'error'); return; }
     try {
-        showToast('授权USDT...', '');
+        showToast('1/2 正在授权USDT...', '');
         await rpcWrite(CONTRACTS.usdt, '0x095ea7b3' + padAddr(CONTRACTS.mining) + toWei(usdt).padStart(64, '0'));
-        showToast('购买中...', 'success');
+        showToast('授权成功', 'success');
+        showToast('2/2 正在购买矿机...', '');
         await rpcWrite(CONTRACTS.mining, '0x62de3bd1' + toWei(usdt).padStart(64, '0'));
         showToast('购买成功', 'success');
         document.getElementById('presaleAmount').value = '';
         await loadAllData();
-    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+    } catch(err) { showToast('购买失败: ' + (err.message || err), 'error'); }
 }
 
 // ========== 领取 ==========
 async function claimMining() {
     try {
-        showToast('领取中...', '');
+        var addr_param = padAddr(account);
+        var result = await rpcRead(CONTRACTS.mining, '0x0b34d553' + addr_param);
+        var pending = fromWei('0x' + result.slice(258, 322));
+        var activatedAt = hexToInt('0x' + result.slice(386, 450));
+        if (pending <= 0) {
+            if (activatedAt > 0) {
+                var now = Math.floor(Date.now() / 1000);
+                var elapsed = now - activatedAt;
+                var hoursLeft = Math.ceil((86400 - elapsed) / 3600);
+                if (hoursLeft > 0) {
+                    showToast('矿机运行' + Math.floor(elapsed/3600) + '小时，还需等待' + hoursLeft + '小时', 'error');
+                } else {
+                    showToast('暂无收益可领取', 'error');
+                }
+            } else {
+                showToast('请先购买矿机', 'error');
+            }
+            return;
+        }
+        showToast('正在领取...', '');
         await rpcWrite(CONTRACTS.mining, '0x4e71d92d');
         showToast('领取成功', 'success');
         await loadAllData();
     } catch(err) {
-        var msg = err.message || err || '';
-        if (msg.indexOf('0x') >= 0 || msg.indexOf('revert') >= 0) {
-            showToast('暂无收益可领取，矿机需运行满24小时', 'error');
-        } else {
-            showToast('领取失败: ' + msg, 'error');
-        }
+        showToast('领取失败: ' + (err.message || err), 'error');
     }
 }
 
@@ -527,14 +541,15 @@ async function doReinvest() {
     var amount = document.getElementById('reinvestAmount').value;
     if (!amount || parseFloat(amount) <= 0) { showToast('请输入数量', 'error'); return; }
     try {
-        showToast('授权NNB...', '');
+        showToast('1/2 正在授权NNB...', '');
         await rpcWrite(CONTRACTS.token, '0x095ea7b3' + padAddr(CONTRACTS.mining) + toWei(amount).padStart(64, '0'));
-        showToast('复投中...', 'success');
+        showToast('授权成功', 'success');
+        showToast('2/2 正在复投...', '');
         await rpcWrite(CONTRACTS.mining, '0x83b4918b' + toWei(amount).padStart(64, '0'));
         showToast('复投成功', 'success');
         closeModal('reinvestModal');
         await loadAllData();
-    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+    } catch(err) { showToast('复投失败: ' + (err.message || err), 'error'); }
 }
 
 // ========== 划转 ==========
@@ -560,12 +575,12 @@ async function doTransfer() {
             toAddr = addr;
         } else { showToast('地址格式错误', 'error'); return; }
 
-        showToast('划转中...', '');
+        showToast('正在划转...', '');
         await rpcWrite(CONTRACTS.token, '0xa9059cbb' + padAddr(toAddr) + toWei(amount).padStart(64, '0'));
         showToast('划转成功', 'success');
         closeModal('transferModal');
         await loadAllData();
-    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+    } catch(err) { showToast('操作失败: ' + (err.message || err), 'error'); }
 }
 
 // ========== 交易 ==========
@@ -588,14 +603,15 @@ async function buyNNB() {
     var usdt = document.getElementById('buyAmount').value;
     if (!usdt || parseFloat(usdt) < 10) { showToast('最低10 USDT', 'error'); return; }
     try {
-        showToast('授权USDT...', '');
+        showToast('1/2 正在授权USDT...', '');
         await rpcWrite(CONTRACTS.usdt, '0x095ea7b3' + padAddr(CONTRACTS.trade) + toWei(usdt).padStart(64, '0'));
-        showToast('买入中...', 'success');
+        showToast('授权成功', 'success');
+        showToast('2/2 正在买入...', '');
         await rpcWrite(CONTRACTS.trade, '0xd5adb460' + toWei(usdt).padStart(64, '0'));
         showToast('买入成功', 'success');
         document.getElementById('buyAmount').value = '';
         await loadAllData();
-    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+    } catch(err) { showToast('买入失败: ' + (err.message || err), 'error'); }
 }
 
 async function createSellOrder() {
@@ -603,14 +619,15 @@ async function createSellOrder() {
     var nnb = document.getElementById('sellAmount').value;
     if (!nnb || parseFloat(nnb) <= 0) { showToast('请输入数量', 'error'); return; }
     try {
-        showToast('授权NNB...', '');
+        showToast('1/2 正在授权NNB...', '');
         await rpcWrite(CONTRACTS.token, '0x095ea7b3' + padAddr(CONTRACTS.trade) + toWei(nnb).padStart(64, '0'));
-        showToast('挂单中...', 'success');
+        showToast('授权成功', 'success');
+        showToast('2/2 正在挂单...', '');
         await rpcWrite(CONTRACTS.trade, '0x3c81c4b8' + toWei(nnb).padStart(64, '0'));
         showToast('挂单成功', 'success');
         document.getElementById('sellAmount').value = '';
         await loadAllData();
-    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+    } catch(err) { showToast('挂单失败: ' + (err.message || err), 'error'); }
 }
 
 // ========== 节点 ==========
@@ -623,7 +640,7 @@ async function buyNormalNode() {
         await rpcWrite(CONTRACTS.node, '0xd815e1f4');
         showToast('购买成功', 'success');
         await loadAllData();
-    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+    } catch(err) { showToast('操作失败: ' + (err.message || err), 'error'); }
 }
 
 async function buySuperNode() {
@@ -635,7 +652,7 @@ async function buySuperNode() {
         await rpcWrite(CONTRACTS.node, '0x35a45a60');
         showToast('购买成功', 'success');
         await loadAllData();
-    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+    } catch(err) { showToast('操作失败: ' + (err.message || err), 'error'); }
 }
 
 async function claimNodeDividend() {
@@ -644,7 +661,7 @@ async function claimNodeDividend() {
         await rpcWrite(CONTRACTS.node, '0xf0fc6bca');
         showToast('领取成功', 'success');
         await loadAllData();
-    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+    } catch(err) { showToast('操作失败: ' + (err.message || err), 'error'); }
 }
 
 // ========== 复制链接 ==========
@@ -670,7 +687,7 @@ async function bindReferrer() {
         await rpcWrite(CONTRACTS.dynamic, '0x5603b9f9' + padAddr(account) + refAddr.slice(2).toLowerCase().padStart(64, '0'));
         showToast('绑定成功', 'success');
         await loadTeam();
-    } catch(err) { showToast('失败: ' + (err.message || err), 'error'); }
+    } catch(err) { showToast('操作失败: ' + (err.message || err), 'error'); }
 }
 
 // ========== 初始化 ==========
@@ -683,7 +700,7 @@ window.addEventListener('load', function() {
             if (window.ethereum || (window.bsc && window.bsc.BinanceChain)) {
                 connectWallet();
             } else {
-                setTimeout(tryAutoConnect, 1500);
+                setTimeout(tryAutoConnect, 500);
             }
         }
         tryAutoConnect();
