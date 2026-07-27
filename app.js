@@ -788,11 +788,11 @@ async function loadMyOrders() {
         if (sellList) {
             var html = '';
             // getActiveSellCount
-            var activeCount = hexToInt(await rpcRead(CONTRACTS.trade, '0x' + '3c81c4b8'));
+            var activeCount = hexToInt(await rpcRead(CONTRACTS.trade, '0xb761ea2a'));
             for (var i = 1; i <= 100; i++) {
                 try {
                     // getSellOrderInfo(uint256)
-                    var result = await rpcRead(CONTRACTS.trade, '0x' + '3c81c4b8' + i.toString(16).padStart(64, '0'));
+                    var result = await rpcRead(CONTRACTS.trade, '0x66a468f9' + i.toString(16).padStart(64, '0'));
                     var seller = '0x' + result.slice(26, 66);
                     var nnbRemaining = fromWei('0x' + result.slice(130, 194));
                     var isActive = hexToInt('0x' + result.slice(258, 322));
@@ -820,7 +820,7 @@ async function loadMyOrders() {
             for (var i = 1; i <= 100; i++) {
                 try {
                     // getQueueOrderInfo(uint256) 
-                    var result2 = await rpcRead(CONTRACTS.trade, '0x' + '8d80c922' + i.toString(16).padStart(64, '0'));
+                    var result2 = await rpcRead(CONTRACTS.trade, '0x27c18ad9' + i.toString(16).padStart(64, '0'));
                     var buyer = '0x' + result2.slice(26, 66);
                     var usdtAmount = fromWei('0x' + result2.slice(66, 130));
                     var isMatched = hexToInt('0x' + result2.slice(194, 258));
