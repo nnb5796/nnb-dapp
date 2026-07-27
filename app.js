@@ -225,18 +225,8 @@ async function loadAllData() {
 }
 
 async function loadPrice() {
-    // 读取链上价格和上次更新时间
-    var chainPrice = fromWei(await rpcRead(CONTRACTS.mining, '0x61703b0a'));
-    var lastUpdate = hexToInt(await rpcRead(CONTRACTS.mining, '0x' + '673a7e28'));
-    // 前端计算当前价格（按每日涨幅累加）
-    var now = Math.floor(Date.now() / 1000);
-    var daysPassed = Math.floor((now - lastUpdate) / 86400);
-    var cycle = [0.0039, 0.0040, 0.0041, 0.0042];
-    var price = chainPrice;
-    for (var d = 0; d < daysPassed; d++) {
-        var rate = cycle[(Math.floor((lastUpdate + d * 86400) / 86400)) % cycle.length];
-        price = price * (1 + rate);
-    }
+    // 读取链上价格
+    var price = fromWei(await rpcRead(CONTRACTS.mining, '0x61703b0a'));
     setText('topPrice', price.toFixed(5) + ' U');
     setText('currentPrice', price.toFixed(5) + ' U');
     setText('presalePrice', price.toFixed(5) + ' U');
@@ -267,7 +257,7 @@ async function loadBalances() {
     setText('tradeNnbBal', nnb.toFixed(2) + ' NNB');
     setText('bnbBalance', bnb.toFixed(4) + ' BNB');
     setText('reinvestBalance', nnb.toFixed(2) + ' NNB');
-    setText('reinvestBalUSD', (nnb * (parseFloat(document.getElementById('topPrice')?.textContent) || 0.017)).toFixed(2) + ' USD');
+    setText('reinvestBalUSD', (nnb * 0.017).toFixed(2) + ' USD');
     setText('transferBalance', nnb.toFixed(2) + ' NNB');
 }
 
@@ -542,7 +532,7 @@ function setText(id, val) { var el = document.getElementById(id); if (el) el.tex
 function calcPresale() {
     var usdt = parseFloat(document.getElementById('presaleAmount').value) || 0;
     if (usdt <= 0) return;
-    var price = parseFloat(document.getElementById('topPrice').textContent) || 0.017;
+    var price = 0.017;
     var nnb = usdt / price;
     var release = nnb * 3;
     var rate = 0.009;
@@ -611,7 +601,7 @@ async function claimMining() {
 // ========== 复投 ==========
 function calcReinvest() {
     var nnb = parseFloat(document.getElementById('reinvestAmount').value) || 0;
-    setText('reinvestUSD', (nnb * (parseFloat(document.getElementById('topPrice')?.textContent) || 0.017)).toFixed(2) + ' USD');
+    setText('reinvestUSD', (nnb * 0.017).toFixed(2) + ' USD');
     setText('reinvestRelease', (nnb * 3).toFixed(2) + ' NNB');
 }
 
@@ -633,7 +623,7 @@ async function doReinvest() {
 // ========== 划转 ==========
 function calcTransfer() {
     var nnb = parseFloat(document.getElementById('transferAmount').value) || 0;
-    setText('transferUSD', (nnb * (parseFloat(document.getElementById('topPrice')?.textContent) || 0.017)).toFixed(2) + ' USD');
+    setText('transferUSD', (nnb * 0.017).toFixed(2) + ' USD');
 }
 
 async function doTransfer() {
@@ -664,12 +654,12 @@ async function doTransfer() {
 // ========== 交易 ==========
 function calcBuy() {
     var usdt = parseFloat(document.getElementById('buyAmount').value) || 0;
-    setText('buyExpected', (usdt / (parseFloat(document.getElementById('topPrice')?.textContent) || 0.017)).toFixed(2) + ' NNB');
+    setText('buyExpected', (usdt / 0.017).toFixed(2) + ' NNB');
 }
 
 function calcSell() {
     var nnb = parseFloat(document.getElementById('sellAmount').value) || 0;
-    var usdt = nnb * (parseFloat(document.getElementById('topPrice')?.textContent) || 0.017);
+    var usdt = nnb * 0.017;
     var fee = usdt * 0.10;
     setText('sellExpected', usdt.toFixed(2) + ' USDT');
     setText('sellFee', fee.toFixed(2) + ' USDT');
