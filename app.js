@@ -636,7 +636,7 @@ async function doTransfer() {
         if (/^\d+$/.test(addr)) {
             // ID号划转
             var id = parseInt(addr);
-            var result = await rpcRead(CONTRACTS.mining, '0x8d80c922' + '0x' + id.toString(16).padStart(64, '0'));
+            var result = await rpcRead(CONTRACTS.mining, '0x8d80c922' + id.toString(16).padStart(64, '0'));
             toAddr = '0x' + result.slice(26, 66);
             if (toAddr === '0x0000000000000000000000000000000000000000') { showToast('ID不存在', 'error'); return; }
         } else if (addr.startsWith('0x')) {
