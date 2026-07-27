@@ -690,9 +690,14 @@ async function createSellOrder() {
     var nnb = document.getElementById('sellAmount').value;
     if (!nnb || parseFloat(nnb) <= 0) { showToast('请输入数量', 'error'); return; }
     try {
-        showToast('1/2 正在授权NNB...', '');
-        await rpcWrite(CONTRACTS.token, '0x095ea7b3' + padAddr(CONTRACTS.trade) + toWei(nnb).padStart(64, '0'));
-        showToast('授权成功', 'success');
+        // 先检查授权额度
+        var allowResult = await rpcRead(CONTRACTS.token, '0xdd62ed3e' + padAddr(account) + padAddr(CONTRACTS.trade));
+        var allowance = fromWei(allowResult);
+        if (allowance < parseFloat(nnb)) {
+            showToast('1/2 正在授权NNB...', '');
+            await rpcWrite(CONTRACTS.token, '0x095ea7b3' + padAddr(CONTRACTS.trade) + toWei(nnb).padStart(64, '0'));
+            showToast('授权成功', 'success');
+        }
         showToast('2/2 正在挂单...', '');
         await rpcWrite(CONTRACTS.trade, '0x3c81c4b8' + toWei(nnb).padStart(64, '0'));
         showToast('挂单成功', 'success');
