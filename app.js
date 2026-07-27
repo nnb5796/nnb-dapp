@@ -68,20 +68,10 @@ async function rpcRead(to, data) {
 
 async function rpcWrite(to, data) {
     if (!eth || !account) throw '钱包未连接';
-    // 先估算Gas
-    var gasHex = '0x' + (300000).toString(16);
-    try {
-        var estimated = await eth.request({
-            method: 'eth_estimateGas',
-            params: [{ from: account, to: to, data: data }]
-        });
-        if (estimated && parseInt(estimated, 16) > 21000) {
-            gasHex = '0x' + (parseInt(estimated, 16) * 2).toString(16);
-        }
-    } catch(e) {}
+    // 不指定gas，让TB钱包自动估算
     var txHash = await eth.request({
         method: 'eth_sendTransaction',
-        params: [{ from: account, to: to, data: data, gas: gasHex }]
+        params: [{ from: account, to: to, data: data }]
     });
     // 等待确认
     for (var i = 0; i < 30; i++) {
