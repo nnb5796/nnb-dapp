@@ -592,6 +592,9 @@ async function claimMining() {
         showToast('正在领取...', '');
         await rpcWrite(CONTRACTS.mining, '0x4e71d92d');
         showToast('领取成功', 'success');
+        // 领取后重置实时收益
+        clearInterval(window._timer);
+        setText('realtimeEarn', '0.000000 NNB');
         await loadAllData();
     } catch(err) {
         showToast('领取失败: ' + (err.message || err), 'error');
